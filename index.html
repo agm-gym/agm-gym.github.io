@@ -635,7 +635,7 @@ body.kidmode .wrap{max-width:720px}
 
 
 /* ===== modes : barre + couleurs ===== */
-.modebar{position:sticky;top:env(safe-area-inset-top,0px);z-index:15;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:0 6px 18px rgba(30,15,50,.08)}
+.modebar{position:sticky;top:env(safe-area-inset-top,0px);z-index:15;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:4px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:0 6px 18px rgba(30,15,50,.08)}
 .modebar button{display:flex;align-items:center;justify-content:center;gap:8px;border:0;background:transparent;border-radius:14px;padding:8px 6px;font-weight:800;font-size:14px;color:var(--muted);min-height:46px}
 .modebar .m-ic{font-size:18px}
 .modebar .av{width:28px;height:28px;border-radius:9px;flex:none}
@@ -1019,7 +1019,6 @@ function sessionRow(k,s){
   return `<div class="sess">${dateBlock(s.date)}<div class="sess-body">
     <div class="sess-line"><strong class="tnum">${hhmm(s.s)} – ${hhmm(s.e)}</strong>${statusPill(rsvp[keyFor(k,s)])}</div>
     ${rsvpControl(k,s)}
-    <button class="prog" data-plan="${s.key}"><span class="peek-icons">${p.steps.slice(1,3).map(x=>ico(x.k,'sm')).join('')}</span>Le programme</button>
   </div></div>`;
 }
 function holidayRow(s){
@@ -1072,14 +1071,13 @@ function vAccueil(){
     <div class="pn-top"><div class="tn-l"><span class="tn-k">Prochain cours${hol?' · après les vacances':''}</span><b class="tn-j">${jx}</b><span class="tn-d">${cap1(fr(next.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(next.s)} – ${hhmm(next.e)} · Cuers</span></div>
     <span class="pn-grp">${k.group}<br>${stars(g.n)}</span></div>
     ${rsvpControl(k,next,true)}
-    <button class="tn-prog" data-plan="${next.key}">Le programme : ${esc(p.theme)} ›</button>
   </section>`:'<div class="empty">Pas de cours prévu.</div>'}
   ${todoList(k,real)}
   <div class="dash">
     ${tile('#planning','',pending||'✓',pending?'cours à répondre':'Présences à jour',pending?'warn':'good','📅')}
     ${tile('#messages','',unread||'0',unread>1?'messages non lus':'message non lu',unread?'info':'calm','💬')}
     ${tile('#docs','',docsTodo||'✓',docsTodo?(docsTodo>1?'documents à donner':'document à donner'):'Documents à jour',docsTodo?'warn':'good','📄')}
-    ${tile('','data-mybadges',`${nb}<small>/${ELEMENTS.length}</small>`,`skills validés · 🔥 ${trainCount(k)} cette semaine`,'star','⚡')}
+    ${tile('','data-mybadges',`${nb}<small>/${ELEMENTS.length}</small>`,'skills validés','star','⚡')}
   </div>
   ${nextEv?`<section class="kid-card"><div class="sh"><h2>Prochain événement</h2><a class="link" href="#agenda">Agenda ›</a></div><div class="events one">${eventCard(nextEv,k)}</div></section>`:''}`;
 }
@@ -1244,8 +1242,8 @@ function coachProg(g,s){
   ${picker?`<div class="pick">${Object.keys(APPARATUS).map(k=>`<button data-addstep="${k}">${ico(k)}<span>${APPARATUS[k].name}</span></button>`).join('')}</div>`:''}
   <div class="gear"><b>📋 Matériel à sortir</b>${[...new Set(draft.steps.map(x=>x[0]))].map(k=>`<label class="gear-row"><input type="checkbox"><span>${GEAR[k]}</span><small>${APPARATUS[k].name}</small></label>`).join('')}</div>
   <div class="field"><label for="dDefi">Défi du jour ★</label><input id="dDefi" data-draft="defi" value="${esc(draft.defi)}" maxlength="70"></div>
-  <div class="bulk"><button class="btn ghost" data-preview="${s.key}">👀 Aperçu enfant</button><button class="btn" data-publish>${pub?'Mettre à jour':'Publier aux familles'}</button></div>
-  ${pub?'<p class="hint">✓ Publié : les familles voient ce programme dans « Le programme ».</p>':''}`;
+  <button class="btn big" data-publish>${pub?'Mettre à jour':'Enregistrer le programme'}</button>
+  <p class="hint">${pub?'✓ Enregistré · ':''}Visible uniquement par les coachs : le programme peut changer le jour J selon le groupe.</p>`;
 }
 function coachBadges(g){
   const list=roster(g);
@@ -1254,10 +1252,8 @@ function coachBadges(g){
   return `<div class="gym-pick">${list.map(gym=>{const n=(badges[`${g}|${gym.name}`]||[]).length;return `<button class="kid" data-bgym="${esc(gym.name)}" aria-pressed="${gym.name===badgeGym}">${avatar(gym.name)}${esc(gym.name)}${n?` <small>★${n}</small>`:''}</button>`}).join('')}</div>
   <div class="call-head"><b>${esc(badgeGym)}</b><span class="pill ok">★ ${got.length} / ${ELEMENTS.length}</span></div>
   <div class="badges">${ELEMENTS.map(el=>{const on=got.includes(el.id);return `<button class="badge-el${on?' on':''}" data-el="${el.id}" aria-pressed="${on}">${ico(el.k)}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">★</i>':''}</button>`}).join('')}</div>
-  <p class="hint">Touche un élément réussi : la gymnaste reçoit son badge dans l’appli.</p>
-  <div class="call-head"><b>🎯 Prochains objectifs</b><span class="sess-meta">3 maximum</span></div>
-  <div class="goal-pick">${ELEMENTS.filter(el=>!got.includes(el.id)).map(el=>{const on=(goals[`${g}|${badgeGym}`]||[]).includes(el.id);return `<button class="chip" data-goal="${el.id}" aria-pressed="${on}">${on?'🎯 ':''}${el.name}</button>`}).join('')}</div>
-  <p class="hint">${esc(badgeGym)} reçoit les cartes d’entraînement à la maison qui vont avec.</p>`;
+  <p class="hint">Touche un élément réussi : il apparaît dans le suivi de la gymnaste, visible par ses parents.</p>
+`;
 }
 let coachOn=false, pin='';
 const COACH_PIN='2026'; /* démo uniquement : dans la vraie appli, chaque coach a son compte */
@@ -1283,7 +1279,7 @@ function vCoachs(){
 }
 function myBadges(k){
   const got=badges[`${k.group}|${k.name}`]||[];
-  return `<section class="col"><div class="sh"><h2>Mes badges</h2><span class="pill ok">★ ${got.length} / ${ELEMENTS.length}</span></div>
+  return `<section class="col"><div class="sh"><h2>Les skills de ${esc(k.name)}</h2><span class="pill ok">★ ${got.length} / ${ELEMENTS.length}</span></div>
     <div class="badges mine">${ELEMENTS.map(el=>{const on=got.includes(el.id);return `<div class="badge-el${on?' on':''}" title="${el.name}">${ico(el.k,'sm')}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">★</i>':''}</div>`}).join('')}</div></section>`;
 }
 /* ================= photos (emplacements d'exemple) ================= */
@@ -1433,84 +1429,11 @@ function bankSheet(){
 
 /* ================= défis à la maison ================= */
 /* Exercices choisis pour être sans danger à la maison : souplesse, équilibre, gainage. Pas de roue, poirier ni salto. */
-const HOME_CARDS={
-  oeuf:{title:'Le balancier',ic:'sol',min:3,steps:['Assise, genoux serrés dans les bras','Roule doucement sur le dos','Reviens assise · ×5'],tapis:true},
-  chandelle:{title:'La chandelle',ic:'etire',min:3,steps:['Allongée sur le dos','Monte les jambes bien droites','Tiens 5 secondes'],tapis:true},
-  pont:{title:'Le pont',ic:'etire',min:3,steps:['Sur le dos, pieds à plat','Mains près des oreilles','Pousse et tiens 3 secondes'],tapis:true},
-  flamant:{title:'Équilibre 1 pied',ic:'poutre',min:3,steps:['Debout sur un pied','Bras en couronne','Tiens 10 secondes, puis change'],tapis:false},
-  planche:{title:'Gainage planche',ic:'echauf',min:3,steps:['Sur les avant-bras et les pointes','Corps gainé, bien aligné','Tiens 10 secondes, 3 fois'],tapis:true},
-  lapin:{title:'Sauts extension',ic:'saut',min:3,steps:['Pieds joints','Saute haut, bras tendus','×10, réception amortie'],tapis:false},
-  ecart:{title:'Prépa grand écart',ic:'etire',min:5,steps:['Assise, jambes écartées','Penche-toi doucement en avant','Respire calmement 5 fois'],tapis:true},
-};
-const EL_CARD={rav:'oeuf',rar:'oeuf',chd:'chandelle',pont:'pont',roue:'planche',atr:'planche',eqp:'flamant',dtp:'flamant',apb:'planche',bal:'planche',sext:'lapin',sgr:'lapin'};
-let goals=store.get('goals',{'GAF 1|Lia':['pont','eqp']}), stamps=store.get('stamps',{});
-const weekDays=()=>{const m=new Date(today);m.setDate(today.getDate()-((today.getDay()+6)%7));return [...Array(7)].map((_,i)=>{const d=new Date(m);d.setDate(m.getDate()+i);return d})};
-const trainCount=k=>{const w=weekDays().map(iso);return Object.entries(stamps).filter(([key])=>key.startsWith(k.id+'|')).reduce((a,[,v])=>a+v.filter(d=>w.includes(d)).length,0)};
-function homeChallenges(k){
-  const gl=(goals[`${k.group}|${k.name}`]||[]); const got=badges[`${k.group}|${k.name}`]||[];
-  if(!gl.length) return `<section class="kid-card"><div class="sh"><h2>Mon training maison</h2></div><div class="empty">Ton coach va bientôt te fixer un objectif.</div></section>`;
-  const cardIds=[...new Set(gl.map(e=>EL_CARD[e]))]; const t=iso(today);
-  return `<section class="kid-card"><div class="sh"><h2>Mon training maison</h2><span class="pill fire">🔥 ${trainCount(k)} cette semaine</span></div>
-    <div class="goals">${gl.map(e=>{const el=ELEMENTS.find(x=>x.id===e);const won=got.includes(e);return `<span class="goal${won?' won':''}">${won?'✓ Validé :':'Objectif :'} <b>${el.name}</b></span>`}).join('')}</div>
-    <div class="hcards">${cardIds.map(id=>{const c=HOME_CARDS[id];const st=stamps[`${k.id}|${id}`]||[];const doneToday=st.includes(t);
-      return `<article class="hcard" style="--c:${APPARATUS[c.ic].col}">
-        <div class="hc-top">${ico(c.ic,'xl')}<div><b>${c.title}</b><span class="hc-min">⏱ ${c.min} min</span></div></div>
-        <ol class="hc-steps pics">${c.steps.map((x,i)=>`<li>${frame(id,i)}<span><i class="n">${i+1}</i>${x}</span></li>`).join('')}</ol>
-        <button class="btn ghost tuto-btn" data-tuto="${id}">▶ Voir le tuto</button>
-        <div class="hc-safe">Échauffe-toi avant${c.tapis?' · Sur un tapis':''}</div>
-        <div class="week-stamps" aria-label="Cette semaine">${weekDays().map(d=>`<span class="${st.includes(iso(d))?'on':''}${iso(d)===t?' today':''}"><i>${st.includes(iso(d))?'🔥':''}</i><small>${fr(d,{weekday:'narrow'})}</small></span>`).join('')}</div>
-        <button class="btn big" data-stamp="${id}" ${doneToday?'disabled':''}>${doneToday?'✓ Validé · à demain':'C’est fait ✓'}</button>
-      </article>`}).join('')}</div></section>`;
-}
-
-
-/* ================= tutos en images (une image par étape) ================= */
-const TUTO={
-  oeuf:[F(PO.tuck,MAT),F(PO.rock,MAT+MOVE('M70 50 Q60 40 46 46')),F(PO.tuck,MAT+BADGE('×5'))],
-  chandelle:[F(PO.lie,MAT),F(PO.legs45,MAT+MOVE('M86 74 Q84 56 74 46')),F(PO.candle,MAT+BADGE('5 s'))],
-  pont:[F(PO.knees,MAT),F(PO.ears,MAT),F(PO.bridge,MAT+BADGE('3 s'))],
-  flamant:[F(PO.stand,FLOOR),F(PO.passe,FLOOR),F(PO.crown,FLOOR+BADGE('10 s'))],
-  planche:[F(PO.plank,MAT),F(PO.plank,MAT+MOVE('M10 58 L92 80')),F(PO.plank,MAT+BADGE('×3'))],
-  lapin:[F(PO.stand,FLOOR),F(PO.jump,FLOOR+'<ellipse class="ap" cx="50" cy="90" rx="14" ry="2.3" opacity=".6"/>'+MOVE('M30 70v-14M70 70v-14')),F(PO.squat,FLOOR+BADGE('×10'))],
-  ecart:[F(PO.straddleHold,MAT),F(PO.straddleFwd,MAT+MOVE('M50 40v12')),F(PO.straddle,MAT+MOVE('M8 30 q4 -4 8 0 q4 4 8 0')+BADGE('×5'))],
-};
-const frame=(id,i,cls='')=>`<span class="ico tuto ${cls}" style="--c:${APPARATUS[HOME_CARDS[id].ic].col}"><svg viewBox="0 0 100 100">${TUTO[id][i]}</svg></span>`;
-let tuto=null, tutoTimer=null;
-function tutoSheet(){
-  const c=HOME_CARDS[tuto.id];
-  document.getElementById('layer').innerHTML=`<div class="scrim" data-close><div class="sheet tuto-sheet" role="dialog" aria-modal="true" aria-label="Tuto ${c.title}"><button class="x" data-close aria-label="Fermer">✕</button>
-    <h2>${c.title}</h2>
-    <div class="tuto-stage">${frame(tuto.id,tuto.i,'big')}<span class="tuto-n">${tuto.i+1}</span></div>
-    <p class="tuto-txt">${c.steps[tuto.i]}</p>
-    <div class="tuto-thumbs">${c.steps.map((_,i)=>`<button class="${i===tuto.i?'on':''}" data-tstep="${i}" aria-label="Étape ${i+1}">${frame(tuto.id,i,'sm')}</button>`).join('')}</div>
-    <div class="tuto-ctrl"><button class="btn ghost" data-tnav="-1" ${tuto.i?'':'disabled'}>‹</button><button class="btn" data-tplay>${tuto.play?'⏸ Pause':'▶ Lecture'}</button><button class="btn ghost" data-tnav="1" ${tuto.i<2?'':'disabled'}>›</button></div>
-    <div class="hc-safe">Échauffe-toi avant${c.tapis?' · Sur un tapis':''}</div></div></div>`;
-}
-function tutoPlay(on){ clearInterval(tutoTimer); tuto.play=on; if(on){ tutoTimer=setInterval(()=>{ if(!document.querySelector('.tuto-sheet')){clearInterval(tutoTimer);return} tuto.i=(tuto.i+1)%3; tutoSheet(); },2200); } tutoSheet(); }
-
-/* ================= sheets ================= */
 function openSheet(html){
   document.getElementById('layer').innerHTML=`<div class="scrim" data-close><div class="sheet" role="dialog" aria-modal="true"><button class="x" data-close aria-label="Fermer">✕</button>${html}</div></div>`;
   const f=document.querySelector('.sheet input, .sheet .btn'); f&&f.focus();
 }
-const closeSheet=()=>{clearInterval(tutoTimer);document.getElementById('layer').innerHTML=''};
-function planSheet(key){
-  const k=kid(); const s=sessions(k.group,16).find(x=>x.type==='sess'&&x.key===key); if(!s) return;
-  const p=planFor(k.group,s);
-  openSheet(`<div class="plan-head"><span class="eyebrow">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)}</span><h2 class="script plan-title">${p.theme}</h2></div>
-  <ol class="plan">${p.steps.map(st=>{const a=APPARATUS[st.k];return `<li style="--c:${a.col}">${ico(st.k)}
-    <div><div class="row"><b>${a.name}</b><span class="tnum plan-min">${st.min} min</span></div><p>${st.txt}</p></div></li>`}).join('')}</ol>
-  <div class="defi"><span class="defi-star">★</span><div><b>Ton défi</b><p>${p.defi}</p></div></div>
-  <div class="bag" aria-label="Dans le sac"><span>💧 Gourde</span><span>🎀 Cheveux attachés</span><span>🚫 Pas de bijoux</span></div>
-  <button class="btn big" data-close>C’est parti 🔥</button>`);
-}
-function lookSheet(){
-  const k=kid(); const l=look(k);
-  openSheet(`<h2>Mon avatar</h2><p class="hint" style="margin:0">Personnalise-le : il apparaît dans tes séances, ton training et tes skills.</p>
-  <div class="look-preview">${['sol','poutre','saut'].map(x=>`<span class="ico xl" style="--c:${APPARATUS[x].col}"><svg viewBox="0 0 100 100">${APPARATUS[x].svg}</svg></span>`).join('')}</div>
-  <div class="field"><label>Ta couleur néon</label><div class="swatches">${NEON_OPTS.map(c=>{const n=c.split(',');return `<button class="sw${l.neon===c?' on':''}" data-look="neon|${c}" style="--sw:linear-gradient(135deg,${n[0]},${n[1]},${n[2]})" aria-label="Dégradé ${n.join(' ')}" aria-pressed="${l.neon===c}"></button>`}).join('')}</div></div>
-  <button class="btn big" data-close>Valider</button>`);
-}
+const closeSheet=()=>{document.getElementById('layer').innerHTML=''};
 function kidSheet(){
   openSheet(`<h2>Ajouter un enfant</h2>
   <form id="kidForm" style="display:flex;flex-direction:column;gap:16px">
@@ -1548,13 +1471,12 @@ let theme=store.get('theme','auto');
 function isDark(){return theme==='dark'||(theme==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches)}
 function applyTheme(){const r=document.documentElement; if(theme==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme',theme);}
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(theme==='auto')render()})}catch(e){}
-let clubSeg=store.get('clubSeg','photos'), kidMode=store.get('kidMode',false);
+let clubSeg=store.get('clubSeg','photos'), kidMode=false;
 let onb=store.get('onb2',false)?null:{step:0,name:kids[0].name,group:kids[0].group};
 function modeBar(cur){
   const k=kid();
   return `<div class="modebar" role="tablist" aria-label="Mode">
     <button role="tab" class="m-parent" data-mode="parent" aria-selected="${cur==='parent'}"><span class="av face">${parentSvg()}</span><span>Parent</span></button>
-    <button role="tab" class="m-kid" data-mode="kid" aria-selected="${cur==='kid'}"><span class="av face">${faceSvg(look(k))}</span><span>${esc(k.name)}</span></button>
     <button role="tab" class="m-coach" data-mode="coach" aria-selected="${cur==='coach'}"><span class="av face">${coachSvg(!(cur==='coach'&&coachOn))}</span><span>Coach</span></button>
   </div>`;
 }
@@ -1573,7 +1495,6 @@ function render(){
   const mode=kidMode?'kid':r==='coachs'?'coach':'parent';
   document.body.classList.toggle('kidmode',mode==='kid');
   document.body.classList.toggle('coachmode',mode==='coach');
-  if(mode==='kid'){ document.getElementById('view').innerHTML=modeBar('kid')+vKid(); renderOnb(); return; }
   const navId=['photos','docs','club'].includes(r)?'club':r;
   const unread=Object.values(CHANNELS).reduce((a,c)=>a+(seenCh[c.id]?0:c.unread),0);
   const nav=TABS.map(([id,l,ic])=>`<a class="tab" href="#${id}" ${id===navId?'aria-current="page"':''}><span class="tab-ic">${ic}${id==='messages'&&unread?`<i class="badge">${unread}</i>`:''}</span><span>${l}</span></a>`).join('');
@@ -1584,46 +1505,24 @@ function render(){
   renderOnb();
 }
 
-/* ================= mode enfant ================= */
-function vKid(){
-  const k=kid(); const real=sessions(k.group,16).filter(s=>s.type==='sess'&&!s.ferie); const next=real[0];
-  const days=next?Math.round((next.date-today)/864e5):null;
-  const jx=days===0?'Jour J':days===1?'Demain':`J-${days}`;
-  const p=next&&planFor(k.group,next); const got=badges[`${k.group}|${k.name}`]||[];
-  return `<div class="kid-top"><div><span class="eyebrow">${k.group} · ${cap1(fr(new Date(),{weekday:'long',day:'numeric',month:'short'}))}</span><h1 class="hello">Hey <span class="script">${esc(k.name)}</span> 👋</h1></div><button class="theme-btn" data-theme-toggle aria-label="Changer de mode">${isDark()?'☀️':'🌙'}</button></div>
-  ${next?`<section class="teen-next">
-    <div class="tn-l"><span class="tn-k">Prochaine séance</span><b class="tn-j">${jx}</b><span class="tn-d">${cap1(fr(next.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(next.s)}</span>${p?`<button class="tn-prog" data-plan="${next.key}">${esc(p.theme)} ›</button>`:''}</div>
-    <button class="me" data-lookme aria-label="Personnaliser mon avatar"><span class="ico huge" style="--c:#7B5CFF"><svg viewBox="0 0 100 100">${APPARATUS.echauf.svg}</svg></span><span class="me-edit">✏️</span></button>
-  </section>`:''}
-  <div class="teen-stats"><div><b>${got.length}<small>/${ELEMENTS.length}</small></b><span>skills validés</span></div><div><b>🔥 ${trainCount(k)}</b><span>trainings cette semaine</span></div><div><b>${p?p.total:0}<small> min</small></b><span>de séance ${next?fr(next.date,{weekday:'long'}):''}</span></div></div>
-  ${p?`<section class="kid-card"><div class="sh"><h2>Ta séance</h2><span class="sess-meta">${esc(p.theme)}</span></div>
-    <div class="kid-steps">${p.steps.map(st=>`<div class="kid-step">${ico(st.k,'xl')}<b>${APPARATUS[st.k].name}</b><small>${st.min} min</small></div>`).join('')}</div>
-    <div class="defi"><span class="defi-star">⚡</span><div><b>Challenge du jour</b><p>${p.defi}</p></div></div></section>`:''}
-  ${homeChallenges(k)}
-  <section class="kid-card"><div class="sh"><h2>Mes skills</h2><span class="pill ok">${got.length} / ${ELEMENTS.length}</span></div>
-    <div class="badges">${ELEMENTS.map(el=>{const on=got.includes(el.id);return `<div class="badge-el${on?' on':''}">${ico(el.k)}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">✓</i>':''}</div>`}).join('')}</div></section>`;
-}
-
 /* ================= premier lancement guidé ================= */
 function renderOnb(){
   const host=document.getElementById('onb');
   if(!onb){ host.innerHTML=''; return; }
   const st=onb.step; const l=look(kid());
-  const dots=`<div class="onb-dots">${[0,1,2,3].map(i=>`<i class="${i===st?'on':''}"></i>`).join('')}</div>`;
+  const dots=`<div class="onb-dots">${[0,1,2].map(i=>`<i class="${i===st?'on':''}"></i>`).join('')}</div>`;
   const screens=[
     `<img class="logo" src="${LOGO}" alt="" width="150" height="150"><h1 class="hello">Bienvenue à <span class="script">l’AGM</span> !</h1><p>Les cours, l’agenda et toutes les infos du club, au même endroit.</p>`,
     `<div class="onb-art">${ico('saut','huge')}</div><h1 class="hello">Ton <span class="script">enfant</span></h1>
      <div class="field"><label for="onbName">Son prénom</label><input id="onbName" data-onbname value="${esc(onb.name)}" maxlength="20"></div>
      <div class="opts three">${Object.entries(GROUPS).map(([n,g])=>`<button class="opt grp${onb.group===n?' on':''}" data-onbgroup="${n}"><b>${n}</b>${stars(g.n)}</button>`).join('')}</div>`,
-    `<div class="onb-art">${ico('poutre','huge')}</div><h1 class="hello">Crée son <span class="script">avatar</span></h1>
-     <div class="field"><label>Ta couleur néon</label><div class="swatches">${NEON_OPTS.map(c=>{const n=c.split(',');return `<button class="sw${l.neon===c?' on':''}" data-look="neon|${c}" style="--sw:linear-gradient(135deg,${n[0]},${n[1]},${n[2]})" aria-label="Dégradé ${n.join(' ')}" aria-pressed="${l.neon===c}"></button>`}).join('')}</div></div>`,
     `<div class="onb-art">${ico('sol','huge')}</div><h1 class="hello">Avant chaque <span class="script">cours</span></h1><p>Un seul geste pour dire aux coachs si ${esc(onb.name||'ton enfant')} sera là.</p>
      <div class="rsvp demo"><span class="yes on">${I.yes}Oui</span><span class="no">${I.no}Non</span></div>`,
   ];
   host.innerHTML=`<div class="onb" role="dialog" aria-modal="true" aria-label="Présentation">
     <div class="onb-top">${st>0?'<button class="link" data-onb="back">‹ Retour</button>':'<span></span>'}<button class="link" data-onb="skip">Passer</button></div>
     <div class="onb-body">${screens[st]}</div>
-    ${dots}<button class="btn big" data-onb="next">${st<3?'Suivant':'C’est parti ! 🤸'}</button></div>`;
+    ${dots}<button class="btn big" data-onb="next">${st<2?'Suivant':'C’est parti ! 🤸'}</button></div>`;
 }
 function burst(r){
   if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -1644,7 +1543,6 @@ document.addEventListener('click',e=>{
   if(d.rsvp){ rsvp[d.key]=rsvp[d.key]===d.rsvp?undefined:d.rsvp; if(rsvp[d.key]!=='no') delete reasons[d.key]; if(!rsvp[d.key]) delete rsvp[d.key];
     const r=b.getBoundingClientRect(); save();render(); if(rsvp[d.key]==='yes'){burst(r);toast(`Youpi ! À bientôt ${kid().name} 🤸`)} else if(rsvp[d.key]) toast('C’est noté, les coachs sont prévenus'); }
   else if(d.reason){ reasons[d.key]=reasons[d.key]===d.reason?undefined:d.reason; save();render(); }
-  else if(d.plan){ planSheet(d.plan); }
   else if(d.send){ pendingDoc=d.send; document.getElementById('docIn').click(); }
   else if(d.open){ opened[d.open]=true; store.set('opened',opened); render(); toast('📄 Le document s’ouvre ici dans la vraie appli'); }
   else if('chan' in d){ chan=d.chan||null; if(chan){seenCh[chan]=1;store.set('seen',seenCh)} render(); focusChat(); }
@@ -1664,44 +1562,32 @@ document.addEventListener('click',e=>{
   else if(d.rm){ if(draft.steps.length>1){ draft.steps.splice(+d.rm,1); render(); } }
   else if('picker' in d){ picker=true; render(); }
   else if(d.addstep){ draft.steps.push([d.addstep,10,'']); picker=false; render(); }
-  else if(d.preview){ const g=coachGroup; const save0=customPlans[draft.key]; customPlans[draft.key]={theme:draft.theme,defi:draft.defi,steps:draft.steps.map(x=>[...x])};
-    const kk=kids.find(x=>x.group===g)||{id:'tmp',name:'Gymnaste',group:g}; const prevK=activeKid, prevKids=kids; if(!kids.includes(kk)){kids=[...kids,kk]} activeKid=kk.id; planSheet(d.preview); activeKid=prevK; kids=prevKids;
-    if(save0) customPlans[draft.key]=save0; else delete customPlans[draft.key]; }
-  else if('publish' in d){ const r=b.getBoundingClientRect(); customPlans[draft.key]={theme:draft.theme||'Mission gym',defi:draft.defi,steps:draft.steps.map(x=>[...x])}; store.set('plans',customPlans); render(); burst(r); toast('📣 Programme envoyé aux familles'); }
+  else if('publish' in d){ const r=b.getBoundingClientRect(); customPlans[draft.key]={theme:draft.theme||'Mission gym',defi:draft.defi,steps:draft.steps.map(x=>[...x])}; store.set('plans',customPlans); render(); burst(r); toast('✓ Programme enregistré'); }
   else if(d.bgym){ badgeGym=d.bgym; render(); }
   else if(d.el){ const key=`${coachGroup}|${badgeGym}`; const arr=badges[key]=badges[key]||[]; const r=b.getBoundingClientRect(); const i=arr.indexOf(d.el); if(i>-1) arr.splice(i,1); else arr.push(d.el); store.set('badges',badges); render(); if(i===-1){burst(r);toast(`★ Badge gagné par ${badgeGym} !`)} }
   else if('mybadges' in d){ openSheet(myBadges(kid())+'<button class="btn big" data-close>Bravo ! 🎉</button>'); }
-  else if(d.look){ const [part,c]=d.look.split('|'); const k=kid(); k.look=Object.assign({},look(k),{[part]:c}); save(); applyLook(); if(onb) renderOnb(); else { lookSheet(); if(kidMode) document.getElementById('view').innerHTML=vKid(); } }
   else if(d.pin){ if(d.pin==='⌫'){pin=pin.slice(0,-1)} else if(pin.length<4){pin+=d.pin} 
     if(pin.length===4){ if(pin.length===4){ const r=b.getBoundingClientRect(); coachOn=true; pin=''; render(); burst(r); toast('👋 Bienvenue coach !'); return; } render(); setTimeout(()=>{pin='';if(route()==='coachs'&&!coachOn)render()},700); toast('Code incorrect'); return; }
     render(); }
   else if('coachout' in d){ coachOn=false; pin=''; location.hash='accueil'; toast('🔒 Espace coachs verrouillé'); }
-  else if(d.onb){ if(d.onb==='back'){onb.step--} else if(d.onb==='skip'||(d.onb==='next'&&onb.step===3)){ const k=kids[0]; if(onb.name.trim()) k.name=onb.name.trim(); k.group=onb.group; activeKid=k.id; save(); store.set('onb2',true); const fin=d.onb==='next'; onb=null; location.hash='accueil'; render(); if(fin){burst(b.getBoundingClientRect());toast(`🎉 Bienvenue ${kids[0].name} !`)} return; } else {onb.step++} renderOnb(); }
+  else if(d.onb){ if(d.onb==='back'){onb.step--} else if(d.onb==='skip'||(d.onb==='next'&&onb.step===2)){ const k=kids[0]; if(onb.name.trim()) k.name=onb.name.trim(); k.group=onb.group; activeKid=k.id; save(); store.set('onb2',true); const fin=d.onb==='next'; onb=null; location.hash='accueil'; render(); if(fin){burst(b.getBoundingClientRect());toast(`🎉 Bienvenue ${kids[0].name} !`)} return; } else {onb.step++} renderOnb(); }
   else if(d.onbgroup){ onb.group=d.onbgroup; renderOnb(); }
-  else if(d.kidmode){ kidMode=d.kidmode==='1'; store.set('kidMode',kidMode); window.scrollTo(0,0); render(); if(kidMode) toast(`🤸 Mode ${kid().name}`); }
-  else if('lookme' in d){ lookSheet(); }
   else if('replay' in d){ onb={step:0,name:kid().name,group:kid().group}; renderOnb(); }
   else if('themeToggle' in d){ theme=isDark()?'light':'dark'; store.set('theme',theme); render(); }
   else if(d.themeSet){ theme=d.themeSet; store.set('theme',theme); render(); toast(theme==='dark'?'🌙 Mode sombre':theme==='light'?'☀️ Mode clair':'📱 Comme le téléphone'); }
   else if('bank' in d){ bankAdded=0; bankSheet(); }
   else if(d.bankf){ bankF=d.bankf; bankSheet(); }
   else if(d.addex){ const [k,m,...n]=d.addex.split('|'); draft.steps.push([k,+m,n.join('|')]); bankAdded++; render(); bankSheet(); toast(`+ ${n.join('|')}`); }
-  else if(d.mode){ const m=d.mode; kidMode=m==='kid'; store.set('kidMode',kidMode); window.scrollTo(0,0);
+  else if(d.mode){ const m=d.mode; window.scrollTo(0,0);
     if(m==='coach'){ if(location.hash!=='#coachs') location.hash='coachs'; else render(); }
     else { if(route()==='coachs') location.hash='accueil'; else render(); }
-    toast(m==='kid'?`🤸 Mode ${kid().name}`:m==='coach'?'🔒 Espace coachs':'👩 Espace parent'); }
-  else if(d.stamp){ const k=kid(); const key=`${k.id}|${d.stamp}`; const r=b.getBoundingClientRect(); const a=stamps[key]=stamps[key]||[]; const t=iso(today); if(!a.includes(t)) a.push(t); store.set('stamps',stamps); render(); burst(r); toast('🔥 Training validé'); }
-  else if(d.goal){ const key=`${coachGroup}|${badgeGym}`; const a=goals[key]=goals[key]||[]; const i=a.indexOf(d.goal); if(i>-1) a.splice(i,1); else if(a.length>=3){ toast('3 objectifs maximum'); return; } else a.push(d.goal); store.set('goals',goals); render(); }
-  else if(d.tuto){ tuto={id:d.tuto,i:0,play:false}; tutoPlay(true); }
-  else if(d.tstep){ tuto.i=+d.tstep; tutoPlay(false); }
-  else if(d.tnav){ tuto.i=Math.max(0,Math.min(2,tuto.i+ +d.tnav)); tutoPlay(false); }
-  else if('tplay' in d){ tutoPlay(!tuto.play); }
+    toast(m==='coach'?'🔒 Espace coachs':'👩 Espace parent'); }
   else if(d.album){ album=d.album; render(); }
   else if(d.ph){ openLb(+d.ph); }
   else if(d.lb){ const n=albumPhotos().length; openLb((lbIndex+ +d.lb+n)%n); }
   else if(d.like){ const r=b.getBoundingClientRect(); likes[d.like]=!likes[d.like]; store.set('likes',likes); if(likes[d.like]) burst(r); openLb(lbIndex); }
   else if('lbclose' in d){ if(b.tagName==='BUTTON'||e.target===b){ closeSheet(); render(); } }
-  else if(d.kid){ if(d.kid===activeKid){ lookSheet(); } else { activeKid=d.kid;save();render(); } }
+  else if(d.kid){ if(d.kid!==activeKid){ activeKid=d.kid;save();render(); } }
   else if('addkid' in d){ kidSheet(); }
   else if(d.filter){ evFilter=d.filter;render(); }
   else if(d.ev){ evSheet(d.ev); }
