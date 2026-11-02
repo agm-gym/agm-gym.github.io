@@ -1,27 +1,26 @@
-# AGM Gym — prototype d'appli parents
+# AGM Gym — prototype d'appli du club
 
-Prototype cliquable d'une application mobile et desktop pour l'Académie Gymnique Méditerranée (AGM).
+Prototype cliquable d'une application mobile et desktop pour l'Académie Gymnique Méditerranée.
 
-**Voir l'appli :** ouvrir `index.html` dans un navigateur, ou la version en ligne via GitHub Pages.
+**Voir l'appli :** ouvrir `index.html` dans un navigateur, ou la version en ligne : https://estellelavenac.github.io/agm-gym/
 
 ## Ce que l'appli propose
-- **Trois modes**, toujours visibles en haut : Parent (violet), Enfant (rose), Coach (turquoise, protégé par un code)
-- **Premier lancement guidé** : 4 écrans pour ajouter son enfant, créer sa gymnaste et comprendre le Oui / Non
-- **Mode Enfant** : sa gymnaste, le compte à rebours avant le cours, sa mission, son défi et ses badges
-- **Accueil** : un tableau de bord simple — prochain cours avec réponse Oui / Non, cours à répondre, messages, documents, badges
-- **Cours** : le planning du groupe (GAF 1, 2 ou 3), avec les vacances et les jours fériés
-- **Programme du cours** : le déroulé pour les enfants (agrès, minutage, défi du jour)
-- **Agenda** : stages, compétitions et temps forts, avec inscription en ligne
-- **Messages** : discussions par groupe, questions au club, covoiturage
-- **Club** : photos (albums), documents (à fournir / du club) et infos pratiques
-- **Ma gymnaste** : l'enfant personnalise sa gymnaste (peau, cheveux, justaucorps), reprise dans tous les pictos
-- **Espace coachs** (protégé par un code ; en démo, n'importe quel code à 4 chiffres fonctionne) : liste d'appel, création du programme du cours à partir d'une banque d'exercices par agrès, avec la liste du matériel à sortir (publié aux familles) et badges de progression
+- **Deux espaces**, toujours visibles en haut de l'écran : Parent (violet) et Coach (turquoise, protégé par un code).
+- **Premier lancement guidé** : 3 écrans pour ajouter son enfant et comprendre le Oui / Non.
+- **Accueil** : le prochain cours avec la réponse Oui / Non, une liste « À faire » (compétitions à confirmer, documents à donner, cours sans réponse), les messages et les skills validés.
+- **Cours** : le planning du groupe (GAF 1, 2 ou 3), avec les vacances et les jours fériés, et « Absente plusieurs cours » pour déclarer une période en une fois.
+- **Agenda** : stages et temps forts avec inscription, bouton « Ajouter à mon agenda » (.ics).
+- **Compétitions** : les coachs sélectionnent les gymnastes ; les parents confirment la présence après avoir accepté la règle sur les frais d'engagement (à la charge des parents en cas d'absence, sauf maladie avec certificat médical).
+- **Messages** : discussions par groupe, questions au club, covoiturage.
+- **Club** : photos (albums), documents (à fournir / du club) et infos pratiques.
+- **Espace coachs** : appel pré-rempli par les réponses des parents, programme du cours composé à partir d'une banque d'exercices (outil interne, non visible par les familles), sélection pour les compétitions avec suivi des confirmations, skills à valider.
+- **Mode sombre** : bouton 🌙 / ☀️ sur l'accueil, ou Auto / Clair / Sombre dans Club → Infos.
+- **Installable** : favicon et icône d'écran d'accueil.
 
-- **Défis à la maison** : le coach fixe 2-3 objectifs par gymnaste ; l'enfant reçoit des cartes d'exercices sans danger (souplesse, équilibre, gainage) avec un tuto en images étape par étape, et gagne un tampon chaque jour
-- **Playlist du cours** : les filles proposent et votent pour leurs chansons (mode Enfant), le coach valide et lance le top 5
-- **Mode sombre** : bouton 🌙 / ☀️ sur l'accueil, ou Auto / Clair / Sombre dans Club → Infos
+## Retours de l'équipe du club
+Après un test avec une coach et une aidante : l'espace gymnaste a été retiré, et le programme du cours n'est plus montré aux familles (il peut changer le jour J, et une séance annoncée puis modifiée déçoit les enfants).
 
 ## À savoir
-Il s'agit d'une ébauche de démonstration. Les horaires 2026-2027 sont réels. Les événements, les messages, les photos et les documents sont des exemples. Les réponses restent enregistrées sur l'appareil de la personne qui teste.
+Il s'agit d'une ébauche de démonstration. Les horaires 2026-2027 sont réels. Les événements, les montants, les messages, les photos et les documents sont des exemples. Les réponses restent enregistrées sur l'appareil de la personne qui teste. Espace coachs : n'importe quel code à 4 chiffres.
 
 Conception : Estelle Lavenac
