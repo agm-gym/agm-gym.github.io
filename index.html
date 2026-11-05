@@ -134,6 +134,14 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 
 /* ---------- presence control ---------- */
 .rsvp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rsvp-done{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--r-md);font-weight:700;font-size:15px;animation:rdIn .35s cubic-bezier(.2,.8,.2,1) both}
+.rsvp-done>span:nth-child(2){flex:1;min-width:0}
+.rsvp-done .rd-ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;flex:none;color:#fff}.rsvp-done .rd-ic svg{width:16px;height:16px}
+.rsvp-done.yes .rd-ic{background:#1FAE78}.rsvp-done.no .rd-ic{background:#E0506A}
+.rsvp-done .link{font-size:13px;font-weight:800;white-space:nowrap}
+.pnext .rsvp-done{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff}.pnext .rsvp-done .link{color:#fff;opacity:.85;text-decoration:underline}
+@keyframes rdIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rsvp-done{animation:none}}
 .rsvp button{border-radius:var(--r-md);padding:13px 10px;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);transition:transform .12s ease,background .15s ease}
 .rsvp button:active{transform:scale(.97)}
 .rsvp button svg{width:18px;height:18px}
@@ -1344,8 +1352,15 @@ const statusPill = st => st==='yes'?'<span class="pill ok">✓ Présente</span>'
 const cap1 = s => s.replace(/^./,c=>c.toUpperCase());
 const ico = (k,cls='') => `<span class="ico ${cls}" style="--c:${APPARATUS[k].col}"><svg viewBox="0 0 100 100">${APPARATUS[k].svg}</svg></span>`;
 
+let rsvpEditKey=null;
 function rsvpControl(k,sess,ask){
   const key=keyFor(k,sess); const st=rsvp[key];
+  if(ask&&st&&rsvpEditKey!==key){
+    const r=reasons[key];
+    const line=st==='yes'?`<span class="rd-ic" aria-hidden="true">${I.yes}</span><span>C’est noté : <b>${esc(k.name)} vient</b> 🤸</span>`:`<span class="rd-ic" aria-hidden="true">${I.no}</span><span><b>${esc(k.name)} ne vient pas</b>${r?` · ${esc(r)}`:''}</span>`;
+    const why=st==='no'&&!r?`<div class="reasons"><span>Pourquoi ? (facultatif)</span>${[['Malade','🤒'],['Famille','🏠'],['Autre','💬']].map(([x,e])=>`<button class="reason" data-reason="${x}" data-key="${key}" aria-pressed="false"><span aria-hidden="true">${e}</span>${x}</button>`).join('')}</div>`:'';
+    return `<div class="rsvp-done ${st}" role="status">${line}<button class="link" data-rsvpedit="${key}">Modifier</button></div>${why}`;
+  }
   const rs = st==='no' ? `<div class="reasons">${[['Malade','🤒'],['Famille','🏠'],['Autre','💬']].map(([r,e])=>`<button class="reason" data-reason="${r}" data-key="${key}" aria-pressed="${reasons[key]===r}"><span aria-hidden="true">${e}</span>${r}</button>`).join('')}</div>`:'';
   return `${ask?`<div class="ask">${esc(k.name)} vient ?</div>`:''}<div class="rsvp" role="group" aria-label="${esc(k.name)} vient au cours ?">
     <button class="yes" data-rsvp="yes" data-key="${key}" aria-pressed="${st==='yes'}">${I.yes}Oui</button>
@@ -1907,7 +1922,8 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('button,[data-close],[data-lbclose]'); if(!b) return;
   const d=b.dataset;
   if('close' in d && (b.tagName==='BUTTON'||e.target===b)){closeSheet();return}
-  if(d.rsvp){ rsvp[d.key]=rsvp[d.key]===d.rsvp?undefined:d.rsvp; if(rsvp[d.key]!=='no') delete reasons[d.key]; if(!rsvp[d.key]) delete rsvp[d.key];
+  if(d.rsvpedit){ rsvpEditKey=d.rsvpedit; render(); return; }
+  if(d.rsvp){ rsvpEditKey=null; rsvp[d.key]=rsvp[d.key]===d.rsvp?undefined:d.rsvp; if(rsvp[d.key]!=='no') delete reasons[d.key]; if(!rsvp[d.key]) delete rsvp[d.key];
     const r=b.getBoundingClientRect(); save();render(); if(rsvp[d.key]==='yes'){burst(r);toast(`Youpi ! À bientôt ${kid().name} 🤸`)} else if(rsvp[d.key]) toast('C’est noté, les coachs sont prévenus'); }
   else if(d.reason){ reasons[d.key]=reasons[d.key]===d.reason?undefined:d.reason; save();render(); }
   else if(d.send){ pendingDoc=d.send; document.getElementById('docIn').click(); }
