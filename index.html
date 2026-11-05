@@ -234,9 +234,7 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .coach-list{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column;gap:6px}
 .coach-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-weight:700;font-size:14px;word-break:break-all}
 .coach-list small{color:var(--muted)}
-.coach-nav{margin:4px 0 14px}
-.pnext.cnext{margin:6px 0 14px;background:repeating-linear-gradient(115deg,rgba(255,255,255,.045) 0 2px,transparent 2px 16px),radial-gradient(120% 120% at 100% 0%,rgba(63,216,224,.45),transparent 55%),radial-gradient(100% 100% at 0% 100%,rgba(180,76,255,.35),transparent 55%),linear-gradient(140deg,#071E22,#0B3A40 60%,#0F5560);box-shadow:0 18px 40px rgba(6,40,46,.35)}
-.pnext.cnext .tn-j{background:linear-gradient(95deg,#7DF3F8,#B69CFF 55%,#FF8CC6);-webkit-background-clip:text;background-clip:text;color:transparent}.coach-nav a{white-space:nowrap}
+.coach-nav{margin:4px 0 14px;grid-template-columns:1fr 1fr}.coach-nav a{white-space:nowrap}
 body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-content:flex-end}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
@@ -485,7 +483,11 @@ a.brand{text-decoration:none;color:var(--ink)}
 .tick{width:30px;height:30px;flex:none;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:900;color:#fff}
 .gym.here .tick{background:var(--ok);border-color:var(--ok)}
 .timeline-bar{display:flex;flex-direction:column;gap:6px;font-weight:800}
-.timeline-bar .tl{display:flex;height:14px;border-radius:999px;overflow:hidden;gap:2px;background:var(--surface-2)}
+.timeline-bar .tl{height:14px;border-radius:999px;overflow:hidden;background:var(--surface-2)}
+.timeline-bar .tl-fill{display:flex;height:100%;border-radius:999px;background:linear-gradient(90deg,#2EE6D6,#B44CFF 55%,#E0207A);transition:width .3s ease}
+.timeline-bar .tl-fill i{display:block;height:100%}
+.timeline-bar .tl-fill i+i{box-shadow:inset 2px 0 0 rgba(255,255,255,.75)}
+.timeline-bar.warn .tl-fill{background:linear-gradient(90deg,#F2994A,#E0506A)}
 .timeline-bar small{font-size:13px}
 .timeline-bar.ok small{color:var(--ok)} .timeline-bar.warn small{color:var(--wait)}
 .steps-ed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -1494,7 +1496,7 @@ function coachProg(g,s){
   const [h1,m1]=s.s.split(':').map(Number),[h2,m2]=s.e.split(':').map(Number); const dur=(h2*60+m2)-(h1*60+m1);
   const tot=draft.steps.reduce((a,x)=>a+x[1],0); const pub=customPlans[draft.key];
   return `<div class="field"><label for="dTheme">Nom de la mission</label><input id="dTheme" data-draft="theme" value="${esc(draft.theme)}" maxlength="30"></div>
-  <div class="timeline-bar tnum ${tot===dur?'ok':'warn'}"><span>${tot} / ${dur} min</span><div class="tl">${draft.steps.map(x=>`<i style="flex:${x[1]};background:${APPARATUS[x[0]].col}" title="${APPARATUS[x[0]].name}"></i>`).join('')}</div><small>${tot===dur?'Pile la durée du cours 👌':tot<dur?`Il reste ${dur-tot} min`:`${tot-dur} min de trop`}</small></div>
+  <div class="timeline-bar tnum ${tot===dur?'ok':'warn'}"><span>${tot} / ${dur} min</span><div class="tl"><div class="tl-fill" style="width:${Math.min(100,dur?tot/dur*100:0)}%">${draft.steps.map(x=>`<i style="flex:${x[1]}" title="${APPARATUS[x[0]].name} · ${x[1]} min"></i>`).join('')}</div></div><small>${tot===dur?'Pile la durée du cours 👌':tot<dur?`Il reste ${dur-tot} min`:`${tot-dur} min de trop`}</small></div>
   <ol class="steps-ed">${draft.steps.map(([k,m,txt],i)=>`<li>
     ${ico(k)}<div class="st-main"><div class="row"><b>${APPARATUS[k].name}</b><div class="stepper sm"><button data-min="${i}|-5" aria-label="Moins 5 minutes">−</button><b class="tnum">${m}</b><button data-min="${i}|5" aria-label="Plus 5 minutes">+</button></div></div>
     <input data-draft="txt|${i}" value="${esc(txt)}" maxlength="40" aria-label="Consigne pour ${APPARATUS[k].name}" placeholder="Consigne courte"></div>
@@ -1535,7 +1537,7 @@ function vCoachs(){
   ${coachBar()}${coachNav('coachs')}
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
-  ${s?`<section class="pnext cnext" aria-label="Prochain cours"><div class="pn-top"><div class="tn-l"><span class="tn-k">Prochain cours · durée</span><b class="tn-j tnum">${dureeCours(s)}</b><span class="tn-d">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</span></div><span class="pn-grp">${g}${catOf(g)==='GAF'?'<br>'+stars(GROUPS[g].n):''}</span></div></section>`:''}
+  ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
   <div class="seg four" role="tablist">${tabs.map(([id,l])=>`<button role="tab" data-ctab="${id}" aria-selected="${coachTab===id}">${l}</button>`).join('')}</div>
   <section class="card coach-card">${LIVE&&!roster(g).length?'<div class="empty">Aucune gymnaste inscrite dans ce groupe pour l’instant. Elles apparaissent ici dès que leurs parents créent leur compte.</div>':coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
   <p class="proto demo-only">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
