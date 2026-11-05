@@ -228,7 +228,8 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .grp-row small{color:var(--muted);font-weight:700}
 .auth-err{color:#C0392B!important;font-weight:700}
 .acct{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0 4px}.acct a{color:var(--violet);font-weight:700}
-body.live .proto{display:none}
+body.live .proto.demo-only{display:none}
+body.live .proto:not(.demo-only){display:block;background:#FFF4CC;color:#7A5B00;border-radius:12px;padding:8px 12px;font-weight:700}
 .grp-cat,.opt-cat{font-family:var(--f-display);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 2px 2px}
 .grp-cat:first-child,.opt-cat:first-child{margin-top:0}
 .opt-cat+.opts{margin-bottom:6px}
@@ -1425,7 +1426,7 @@ function vCoachs(){
   ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
   <div class="seg four" role="tablist">${tabs.map(([id,l])=>`<button role="tab" data-ctab="${id}" aria-selected="${coachTab===id}">${l}</button>`).join('')}</div>
   <section class="card coach-card">${LIVE&&!roster(g).length?'<div class="empty">Aucune gymnaste inscrite dans ce groupe pour l’instant. Elles apparaissent ici dès que leurs parents créent leur compte.</div>':coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
-  <p class="proto">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
+  <p class="proto demo-only">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
 }
 function myBadges(k){
   const got=badges[`${k.group}|${k.name}`]||[];
@@ -1458,7 +1459,7 @@ function vPhotos(){
   <label class="upload">📷 Ajouter des photos<input id="phIn" type="file" accept="image/*" multiple></label>
   <div class="grid">${list.map(phTile).join('')}</div>
   <div class="privacy"><span class="ev-ic" style="width:40px;height:40px;font-size:20px">🔒</span>Visible seulement par les familles du club</div>
-  <p class="proto">Les vignettes colorées remplacent les vraies photos dans ce prototype</p>`;
+  <p class="proto">Photos données en exemple · les vraies photos du club arrivent bientôt</p>`;
 }
 function openLb(i){
   lbIndex=i; const p=albumPhotos()[i]; if(!p) return;
@@ -1535,7 +1536,7 @@ function chanView(){
 function vMessages(){
   return `<h1 class="hello">La <span class="script">commu</span></h1>
   <div class="chat${chan?' has-chan':''}">${chanList()}${chan?chanView():'<div class="thread empty-thread"><span class="big-emoji">💬</span>Choisis une discussion</div>'}</div>
-  <p class="proto">Messages donnés en exemple · dans ce prototype, tes messages restent sur ton appareil</p>`;
+  <p class="proto">Messages donnés en exemple · pour l’instant, tes messages restent sur ton appareil</p>`;
 }
 function sendMsg(txt){
   txt=txt.trim(); if(!txt||!chan) return;
