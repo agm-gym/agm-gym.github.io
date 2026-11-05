@@ -234,6 +234,8 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .coach-list{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column;gap:6px}
 .coach-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-weight:700;font-size:14px;word-break:break-all}
 .coach-list small{color:var(--muted)}
+.coach-nav{margin:4px 0 14px}.coach-nav a{white-space:nowrap}
+body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-content:flex-end}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-err{color:#C0392B!important;font-weight:700}
@@ -1097,7 +1099,7 @@ async function pullMsgs(){
   const {data,error}=await sb.from('messages').select('*').order('created_at',{ascending:false}).limit(800); if(error) throw error;
   liveMsgs={}; (data||[]).slice().reverse().forEach(m=>(liveMsgs[m.channel]=liveMsgs[m.channel]||[]).push(m));
   if(!seenAt){ seenAt={}; liveChans().forEach(c=>{const l=liveMsgs[c.id]; seenAt[c.id]=l&&l.length?l[l.length-1].created_at:''}); store.set('seenAt',seenAt); }
-  if(chan&&route()==='messages') markSeen(chan,true);
+  if(chan&&inMsgs()) markSeen(chan,true);
   const sig=(data||[]).length+'|'+((data||[])[0]||{}).id; const changed=sig!==msgSig; msgSig=sig; return changed;
 }
 const unreadOf=id=>(liveMsgs[id]||[]).filter(m=>m.author_id!==me.id&&m.created_at>((seenAt||{})[id]||'')).length;
@@ -1117,7 +1119,7 @@ async function liveSend(txt){
   (liveMsgs[chan]=liveMsgs[chan]||[]).push(tmp); render(); focusChat();
   const {error}=await sb.from('messages').insert({channel:chan,author_name:myAuthorName(),body:txt});
   if(error){ liveMsgs[chan]=liveMsgs[chan].filter(m=>m!==tmp); toast('⚠️ Message non envoyé, vérifie ta connexion'); const i=document.getElementById('msgIn'); render(); const j=document.getElementById('msgIn'); if(j) j.value=txt; return; }
-  try{ await pullMsgs(); }catch(e){} markSeen(chan); if(route()==='messages') { render(); focusChat(); }
+  try{ await pullMsgs(); }catch(e){} markSeen(chan); if(inMsgs()) { render(); focusChat(); }
 }
 document.addEventListener('submit',async e=>{
   if(e.target.id!=='nameForm') return; e.preventDefault();
@@ -1127,7 +1129,7 @@ document.addEventListener('submit',async e=>{
   me.name=v; closeSheet(); render(); if(pendingSend){ const t=pendingSend; pendingSend=null; liveSend(t); }
 });
 async function msgPoll(){
-  if(!LIVE||!me||document.visibilityState!=='visible'||route()!=='messages') return;
+  if(!LIVE||!me||document.visibilityState!=='visible'||!inMsgs()) return;
   try{ if(!(await pullMsgs())) return; }catch(e){ return; }
   const box=document.getElementById('msgs'), list=document.querySelector('.chans');
   if(document.activeElement&&document.activeElement.id==='msgIn'&&box){ const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<60; box.innerHTML=msgsHtml(); if(list) list.outerHTML=chanList(); if(atEnd) box.scrollTop=box.scrollHeight; }
@@ -1528,7 +1530,7 @@ function vCoachs(){
   const g=coachGroup; const s=coachNext(g);
   const tabs=[['appel','✓ Appel'],['prog','🗒️ Prog.'],['compet','🏅 Compét'],['badges','★ Badges']];
   return `
-  <div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span>${LIVE?'<span style="display:flex;gap:14px"><button class="link" data-coachlist>👥 Coachs du club</button><button class="link" data-logout>Se déconnecter</button></span>':'<button class="link" data-coachout>🔒 Verrouiller</button>'}</div>
+  ${coachBar()}${coachNav('coachs')}
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
@@ -1742,6 +1744,10 @@ function evSheet(id){
 
 /* ================= rendu & événements ================= */
 function route(){return (location.hash||'#accueil').slice(1)}
+const inMsgs=()=>['messages','cmessages'].includes(route());
+const coachNav=cur=>{const un=totalUnread(); return `<div class="seg coach-nav" role="tablist"><a role="tab" href="#coachs" aria-selected="${cur==='coachs'}">📋 Mes groupes</a><a role="tab" href="#cmessages" aria-selected="${cur==='cmessages'}">💬 Messages${un?` <i class="dotbadge">${un}</i>`:''}</a></div>`};
+function coachBar(){ return `<div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span>${LIVE?'<span style="display:flex;gap:14px"><button class="link" data-coachlist>👥 Coachs du club</button><button class="link" data-logout>Se déconnecter</button></span>':'<button class="link" data-coachout>🔒 Verrouiller</button>'}</div>`; }
+function vCoachMsgs(){ if(!coachOn) return vLock(); return coachBar()+coachNav('cmessages')+vMessages(); }
 let theme=store.get('theme','auto');
 function isDark(){return theme==='dark'||(theme==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches)}
 function applyTheme(){const r=document.documentElement; if(theme==='auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme',theme);}
@@ -1765,16 +1771,16 @@ function vHub(seg){
 }
 function render(){
   applyTheme(); applyLook();
-  const raw=route(); const known=[...TABS.map(t=>t[0]),'photos','docs','coachs'];
+  const raw=route(); const known=[...TABS.map(t=>t[0]),'photos','docs','coachs','cmessages'];
   const r=known.includes(raw)?raw:'accueil';
-  const mode=kidMode?'kid':r==='coachs'?'coach':'parent';
+  const mode=kidMode?'kid':(r==='coachs'||r==='cmessages')?'coach':'parent';
   document.body.classList.toggle('kidmode',mode==='kid');
   document.body.classList.toggle('coachmode',mode==='coach');
   const navId=['photos','docs','club'].includes(r)?'club':r;
   const unread=totalUnread();
   const nav=TABS.map(([id,l,ic])=>`<a class="tab" href="#${id}" ${id===navId?'aria-current="page"':''}><span class="tab-ic">${ic}${id==='messages'&&unread?`<i class="badge">${unread}</i>`:''}</span><span>${l}</span></a>`).join('');
   document.getElementById('sideNav').innerHTML=nav; document.getElementById('tabNav').innerHTML=nav;
-  const views={accueil:vAccueil,planning:vPlanning,agenda:vAgenda,messages:vMessages,coachs:vCoachs,
+  const views={accueil:vAccueil,planning:vPlanning,agenda:vAgenda,messages:vMessages,coachs:vCoachs,cmessages:vCoachMsgs,
     photos:()=>vHub('photos'),docs:()=>vHub('docs'),club:()=>vHub('infos')};
   document.getElementById('view').innerHTML=modeBar(mode)+views[r]();
   renderOnb();
