@@ -226,6 +226,8 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .grp-row{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;padding:10px 12px;border-radius:var(--r-sm);background:var(--surface-2)}
 .grp-row b{font-family:var(--f-display);font-size:17px;color:var(--violet)}
 .grp-row small{color:var(--muted);font-weight:700}
+.readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
+.delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-err{color:#C0392B!important;font-weight:700}
 .acct{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0 4px}.acct a{color:var(--violet);font-weight:700}
 body.live .proto.demo-only{display:none}
@@ -1021,6 +1023,7 @@ async function pull(){
   badges={}; B.forEach(r=>{const kd=kidById(r.kid_id); if(kd){const k=`${kd.group}|${kd.name}`;(badges[k]=badges[k]||[]).push(r.skill_id)}});
   customPlans={}; PL.forEach(r=>{customPlans[`${r.grp}|${r.session_key}`]=r.content});
   last={}; Object.keys(TABLES).forEach(t=>last[t]=snap(t));
+  try{ await pullMsgs(); }catch(e){ console.warn('msgs',e); }
 }
 const busyUI=()=>document.getElementById('layer').innerHTML||(onb&&!LIVE)||document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
 async function refresh(){ if(!me||busyUI()||onb) return; try{ await pull(); if(!busyUI()&&!onb) render(); }catch(e){ console.warn(e); } }
@@ -1065,7 +1068,7 @@ document.addEventListener('click',e=>{ if(e.target.closest('[data-authback]')){ 
 async function afterLogin(user){
   if(me&&me.id===user.id) return;
   me={id:user.id,email:user.email,role:'parent'};
-  try{ const {data}=await sb.from('profiles').select('role,display_name').eq('id',user.id).maybeSingle(); if(data) me.role=data.role; }catch(e){}
+  try{ const {data}=await sb.from('profiles').select('role,display_name').eq('id',user.id).maybeSingle(); if(data){ me.role=data.role; me.name=data.display_name||''; } }catch(e){}
   coachOn=me.role==='coach';
   try{ await pull(); }catch(err){ console.warn(err); toast('⚠️ Connexion au club impossible pour le moment'); }
   document.getElementById('onb').innerHTML='';
@@ -1074,6 +1077,56 @@ async function afterLogin(user){
   render();
 }
 async function logout(){ if(pushing) await pushing; try{ await sb.auth.signOut(); }catch(e){} me=null; coachOn=false; auth={step:'email',email:'',busy:false,err:''}; location.hash='accueil'; renderAuth(); }
+
+/* ---------- messagerie en ligne ---------- */
+let liveMsgs={}, seenAt=store.get('seenAt',null), delPending=null, pendingSend=null, msgSig='';
+const CH_FIXED=[{id:'club',ic:'❓',name:'Questions au club',desc:'Les coachs et le bureau répondent'},{id:'all',ic:'💜',name:'Annonces du club',desc:'Les infos importantes, publiées par les coachs',coachOnly:true},{id:'covoit',ic:'🚗',name:'Covoiturage',desc:'On s’organise pour les trajets'}];
+function liveChans(){ const groups=me&&me.role==='coach'?Object.keys(GROUPS):[...new Set(kids.filter(k=>k.name).map(k=>k.group))];
+  return [...groups.map(g=>({id:'grp:'+g,ic:catOf(g)==='Babies'?'🧸':'🤸',name:`Parents ${g}`,desc:'Les familles du groupe et les coachs'})),...CH_FIXED]; }
+const chanDef=id=>LIVE?liveChans().find(c=>c.id===id):CHANNELS[id]&&{...CHANNELS[id],name:CHANNELS[id].name()};
+const canWrite=c=>!c.coachOnly||(me&&me.role==='coach');
+async function pullMsgs(){
+  const {data,error}=await sb.from('messages').select('*').order('created_at',{ascending:false}).limit(800); if(error) throw error;
+  liveMsgs={}; (data||[]).slice().reverse().forEach(m=>(liveMsgs[m.channel]=liveMsgs[m.channel]||[]).push(m));
+  if(!seenAt){ seenAt={}; liveChans().forEach(c=>{const l=liveMsgs[c.id]; seenAt[c.id]=l&&l.length?l[l.length-1].created_at:''}); store.set('seenAt',seenAt); }
+  if(chan&&route()==='messages') markSeen(chan,true);
+  const sig=(data||[]).length+'|'+((data||[])[0]||{}).id; const changed=sig!==msgSig; msgSig=sig; return changed;
+}
+const unreadOf=id=>(liveMsgs[id]||[]).filter(m=>m.author_id!==me.id&&m.created_at>((seenAt||{})[id]||'')).length;
+function markSeen(id,quiet){ const l=liveMsgs[id]; seenAt=seenAt||{}; seenAt[id]=l&&l.length?l[l.length-1].created_at:new Date().toISOString(); store.set('seenAt',seenAt); }
+const totalUnread=()=>LIVE?(me?liveChans().reduce((a,c)=>a+unreadOf(c.id),0):0):Object.values(CHANNELS).reduce((a,c)=>a+(seenCh[c.id]?0:c.unread),0);
+function msgTime(iso){ const d=new Date(iso), n=new Date(), hm=`${pad(d.getHours())}:${pad(d.getMinutes())}`, y=new Date(n); y.setDate(n.getDate()-1);
+  if(d.toDateString()===n.toDateString()) return hm; if(d.toDateString()===y.toDateString()) return 'Hier '+hm; return cap1(fr(d,{weekday:'short',day:'numeric',month:'short'}))+' '+hm; }
+function myAuthorName(){ if(!me||!me.name) return ''; if(me.role==='coach') return 'Coach '+me.name;
+  const ks=kids.filter(k=>k.name).map(k=>k.name); return ks.length?`${me.name} (parent de ${ks.join(' et ')})`:me.name; }
+function nameSheet(){ openSheet(`<h2 class="sheet-title">Ton prénom</h2><p class="hint">Il s’affiche à côté de tes messages, avec le prénom de ton enfant.</p>
+  <form id="nameForm" style="display:flex;flex-direction:column;gap:16px"><div class="field"><label for="myName">Ton prénom</label><input id="myName" maxlength="30" required autocomplete="given-name" value="${esc((me&&me.name)||'')}"></div>
+  <button class="btn big" type="submit">Enregistrer et envoyer</button></form>`); }
+async function liveSend(txt){
+  const c=chanDef(chan); if(!c||!canWrite(c)) return;
+  if(!me.name){ pendingSend=txt; nameSheet(); return; }
+  const tmp={id:'tmp'+Date.now(),channel:chan,author_id:me.id,author_name:myAuthorName(),is_coach:me.role==='coach',body:txt,created_at:new Date().toISOString(),pending:1};
+  (liveMsgs[chan]=liveMsgs[chan]||[]).push(tmp); render(); focusChat();
+  const {error}=await sb.from('messages').insert({channel:chan,author_name:myAuthorName(),body:txt});
+  if(error){ liveMsgs[chan]=liveMsgs[chan].filter(m=>m!==tmp); toast('⚠️ Message non envoyé, vérifie ta connexion'); const i=document.getElementById('msgIn'); render(); const j=document.getElementById('msgIn'); if(j) j.value=txt; return; }
+  try{ await pullMsgs(); }catch(e){} markSeen(chan); if(route()==='messages') { render(); focusChat(); }
+}
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='nameForm') return; e.preventDefault();
+  const v=document.getElementById('myName').value.trim(); if(!v) return;
+  const {error}=await sb.from('profiles').update({display_name:v}).eq('id',me.id);
+  if(error){ toast('⚠️ Impossible d’enregistrer, réessaie'); return; }
+  me.name=v; closeSheet(); render(); if(pendingSend){ const t=pendingSend; pendingSend=null; liveSend(t); }
+});
+async function msgPoll(){
+  if(!LIVE||!me||document.visibilityState!=='visible'||route()!=='messages') return;
+  try{ if(!(await pullMsgs())) return; }catch(e){ return; }
+  const box=document.getElementById('msgs'), list=document.querySelector('.chans');
+  if(document.activeElement&&document.activeElement.id==='msgIn'&&box){ const atEnd=box.scrollHeight-box.scrollTop-box.clientHeight<60; box.innerHTML=msgsHtml(); if(list) list.outerHTML=chanList(); if(atEnd) box.scrollTop=box.scrollHeight; }
+  else if(!document.getElementById('layer').innerHTML){ render(); focusChat(); }
+}
+setInterval(msgPoll,5000);
+
 async function liveBoot(){
   document.body.classList.add('live'); onb=null;
   try{ await loadSb(); }catch(e){ document.getElementById('view').innerHTML='<div class="empty" style="margin-top:30vh">Impossible de charger l’appli : vérifie ta connexion puis recharge la page.</div>'; return; }
@@ -1205,7 +1258,7 @@ function vAccueil(){
   const hol=list[0]&&list[0].type==='hol'?list[0]:null;
   const nextEv=EVENTS.find(e=>parse(e.end||e.date)>=today && forGroup(e,k.group));
   const pending=real.slice(0,6).filter(s=>!rsvp[keyFor(k,s)]).length;
-  const unread=Object.values(CHANNELS).reduce((a,c)=>a+(seenCh[c.id]?0:c.unread),0);
+  const unread=totalUnread();
   const docsTodo=TODO_DOCS.filter(d=>!(sent[`${k.id}|${d.id}`]||d.init==='done')).length;
   const nb=(badges[`${k.group}|${k.name}`]||[]).length;
   const p=next&&planFor(k.group,next);
@@ -1518,10 +1571,26 @@ const QUICK = {gaf:['👍 Merci !','Elle sera là 😊','Bravo les filles ! 👏
 let chan=null, myMsgs=store.get('msgs',{}), hearts=store.get('hearts',{}), seenCh=store.get('seen',{}), typing=false;
 const avatar = n => `<span class="m-av" style="--h:${[...n].reduce((a,c)=>a+c.charCodeAt(0),0)%360}">${esc(n[0])}</span>`;
 function chanList(){
+  if(LIVE) return `<div class="chans">${liveChans().map(c=>{const l=liveMsgs[c.id]||[];const last=l[l.length-1];const un=me?unreadOf(c.id):0;
+    return `<button class="chan${chan===c.id?' on':''}" data-chan="${esc(c.id)}"><span class="chan-ic" aria-hidden="true">${c.ic}</span><span class="chan-main"><b>${esc(c.name)}</b><small>${last?esc((last.author_id===me.id?'Vous : ':'')+last.body):esc(c.desc)}</small></span>${un?`<i class="badge">${un}</i>`:''}</button>`}).join('')}</div>`;
   return `<div class="chans">${Object.values(CHANNELS).map(c=>{const last=[...SEED[c.id],...(myMsgs[c.id]||[])].slice(-1)[0];const un=seenCh[c.id]?0:c.unread;
     return `<button class="chan${chan===c.id?' on':''}" data-chan="${c.id}"><span class="chan-ic" aria-hidden="true">${c.ic}</span><span class="chan-main"><b>${c.name()}</b><small>${last?esc((last.me?'Vous : ':'')+last.txt):c.desc}</small></span>${un?`<i class="badge">${un}</i>`:''}</button>`}).join('')}</div>`;
 }
+function msgsHtml(){
+  const l=liveMsgs[chan]||[]; const coach=me&&me.role==='coach';
+  if(!l.length) return `<div class="empty" style="margin:auto">Aucun message pour l’instant.${canWrite(chanDef(chan)||{})?' Lance la discussion 👋':''}</div>`;
+  return l.map(m=>{const mine=m.author_id===me.id; const canDel=!m.pending&&(mine||coach);
+    return `<div class="msg${mine?' me':''}">${mine?'':avatar(m.author_name)}<div class="bub-wrap">${mine?'':`<span class="who">${esc(m.author_name)}${m.is_coach?' <span class="coach-tag">Club</span>':''}</span>`}
+    <div class="bub">${esc(m.body)}</div><div class="m-meta"><span>${m.pending?'Envoi…':msgTime(m.created_at)}</span>${canDel?`<button class="link delmsg" data-delmsg="${m.id}">${delPending===m.id?'Confirmer la suppression':'Supprimer'}</button>`:''}</div></div></div>`}).join('');
+}
 function chanView(){
+  if(LIVE){ const c=chanDef(chan); if(!c){ chan=null; return '<div class="thread empty-thread"><span class="big-emoji">💬</span>Choisis une discussion</div>'; } const w=canWrite(c);
+    return `<div class="thread">
+    <div class="thread-head"><button class="back" data-chan="" aria-label="Retour aux discussions">‹</button><span class="chan-ic" aria-hidden="true">${c.ic}</span><div><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></div></div>
+    <div class="msgs" id="msgs">${msgsHtml()}</div>
+    ${w?`<div class="quick">${(QUICK[c.id.startsWith('grp:')?'gaf':c.id]||[]).map(q=>`<button class="chip" data-quick="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <form class="composer" id="composer"><input id="msgIn" autocomplete="off" maxlength="2000" placeholder="Écrire un message…" aria-label="Message"><button class="send" aria-label="Envoyer"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button></form>`:'<p class="readonly-note">📌 Seuls les coachs publient dans cette discussion.</p>'}
+  </div>`; }
   const c=CHANNELS[chan]; const list=[...SEED[chan],...(myMsgs[chan]||[])];
   return `<div class="thread">
     <div class="thread-head"><button class="back" data-chan="" aria-label="Retour aux discussions">‹</button><span class="chan-ic" aria-hidden="true">${c.ic}</span><div><b>${c.name()}</b><small>${c.desc}</small></div></div>
@@ -1536,10 +1605,10 @@ function chanView(){
 function vMessages(){
   return `<h1 class="hello">La <span class="script">commu</span></h1>
   <div class="chat${chan?' has-chan':''}">${chanList()}${chan?chanView():'<div class="thread empty-thread"><span class="big-emoji">💬</span>Choisis une discussion</div>'}</div>
-  <p class="proto">Messages donnés en exemple · pour l’instant, tes messages restent sur ton appareil</p>`;
+  ${LIVE?'':'<p class="proto">Messages donnés en exemple · dans ce prototype, tes messages restent sur ton appareil</p>'}`;
 }
 function sendMsg(txt){
-  txt=txt.trim(); if(!txt||!chan) return;
+  txt=txt.trim(); if(!txt||!chan) return; if(LIVE) return liveSend(txt);
   const now=new Date(); (myMsgs[chan]=myMsgs[chan]||[]).push({me:1,who:'Moi',t:`${pad(now.getHours())}:${pad(now.getMinutes())}`,txt});
   store.set('msgs',myMsgs);
   if(chan==='club'){ typing=true; const c=chan; setTimeout(()=>{typing=false;const n=new Date();myMsgs[c].push({who:'Coach Manon',coach:1,t:`${pad(n.getHours())}:${pad(n.getMinutes())}`,txt:'Merci pour ton message ! On te répond très vite 😊'});store.set('msgs',myMsgs);if(route()==='messages'&&chan===c){render();focusChat()}},1600); }
@@ -1647,7 +1716,7 @@ function render(){
   document.body.classList.toggle('kidmode',mode==='kid');
   document.body.classList.toggle('coachmode',mode==='coach');
   const navId=['photos','docs','club'].includes(r)?'club':r;
-  const unread=Object.values(CHANNELS).reduce((a,c)=>a+(seenCh[c.id]?0:c.unread),0);
+  const unread=totalUnread();
   const nav=TABS.map(([id,l,ic])=>`<a class="tab" href="#${id}" ${id===navId?'aria-current="page"':''}><span class="tab-ic">${ic}${id==='messages'&&unread?`<i class="badge">${unread}</i>`:''}</span><span>${l}</span></a>`).join('');
   document.getElementById('sideNav').innerHTML=nav; document.getElementById('tabNav').innerHTML=nav;
   const views={accueil:vAccueil,planning:vPlanning,agenda:vAgenda,messages:vMessages,coachs:vCoachs,
@@ -1697,7 +1766,8 @@ document.addEventListener('click',e=>{
   else if(d.reason){ reasons[d.key]=reasons[d.key]===d.reason?undefined:d.reason; save();render(); }
   else if(d.send){ pendingDoc=d.send; document.getElementById('docIn').click(); }
   else if(d.open){ opened[d.open]=true; store.set('opened',opened); render(); toast('📄 Le document s’ouvre ici dans la vraie appli'); }
-  else if('chan' in d){ chan=d.chan||null; if(chan){seenCh[chan]=1;store.set('seen',seenCh)} render(); focusChat(); }
+  else if('chan' in d){ chan=d.chan||null; delPending=null; if(chan){ if(LIVE) markSeen(chan); else {seenCh[chan]=1;store.set('seen',seenCh)} } render(); focusChat(); }
+  else if(d.delmsg){ if(delPending!==d.delmsg){ delPending=d.delmsg; const y=document.getElementById('msgs')?.scrollTop; render(); const m=document.getElementById('msgs'); if(m&&y!=null) m.scrollTop=y; return; } delPending=null; const id=d.delmsg; sb.from('messages').delete().match({id}).then(async({error})=>{ if(error){toast('⚠️ Suppression impossible');return} liveMsgs[chan]=(liveMsgs[chan]||[]).filter(m=>m.id!==id); try{await pullMsgs()}catch(e){} render(); toast('Message supprimé'); }); }
   else if(d.quick){ sendMsg(d.quick); }
   else if(d.heart){ const r=b.getBoundingClientRect(); hearts[d.heart]=!hearts[d.heart]; store.set('hearts',hearts); const y=document.getElementById('msgs')?.scrollTop; render(); const m=document.getElementById('msgs'); if(m&&y!=null) m.scrollTop=y; if(hearts[d.heart]) burst(r); }
   else if(d.cgroup){ coachGroup=d.cgroup; store.set('cgroup',coachGroup); draft=null; picker=false; render(); }

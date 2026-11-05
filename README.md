@@ -22,6 +22,6 @@ Prototype cliquable d'une application mobile et desktop pour l'Académie Gymniqu
 Après un test avec une coach et une aidante : l'espace gymnaste a été retiré, et le programme du cours n'est plus montré aux familles (il peut changer le jour J, et une séance annoncée puis modifiée déçoit les enfants).
 
 ## À savoir
-Version en ligne : connexion par code reçu par e-mail, données partagées entre parents et coachs via Supabase (voir `supabase/schema.sql`). Dans la démo (`?demo`) : Les horaires 2026-2027 sont réels. Les événements, les montants, les messages, les photos et les documents sont des exemples. Les réponses restent enregistrées sur l'appareil de la personne qui teste. Espace coachs : n'importe quel code à 4 chiffres.
+Version en ligne : connexion par code reçu par e-mail, données partagées entre parents et coachs via Supabase (voir `supabase/schema.sql`, puis `supabase/02-messagerie.sql` pour la messagerie). Dans la démo (`?demo`) : Les horaires 2026-2027 sont réels. Les événements, les montants, les messages, les photos et les documents sont des exemples. Les réponses restent enregistrées sur l'appareil de la personne qui teste. Espace coachs : n'importe quel code à 4 chiffres.
 
 Conception : Estelle Lavenac
