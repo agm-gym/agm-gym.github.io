@@ -58,6 +58,7 @@ create table public.event_regs (
   kid_id     uuid references public.kids on delete cascade,
   event_id   text,
   status     text not null default 'yes' check (status in ('yes','no')),
+  guests     int not null default 0,     -- invités (fêtes, gala)
   updated_at timestamptz default now(),
   primary key (kid_id, event_id)
 );

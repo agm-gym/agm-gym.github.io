@@ -226,6 +226,9 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .grp-row{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;padding:10px 12px;border-radius:var(--r-sm);background:var(--surface-2)}
 .grp-row b{font-family:var(--f-display);font-size:17px;color:var(--violet)}
 .grp-row small{color:var(--muted);font-weight:700}
+.auth-err{color:#C0392B!important;font-weight:700}
+.acct{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0 4px}.acct a{color:var(--violet);font-weight:700}
+body.live .proto{display:none}
 .grp-cat,.opt-cat{font-family:var(--f-display);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 2px 2px}
 .grp-cat:first-child,.opt-cat:first-child{margin-top:0}
 .opt-cat+.opts{margin-bottom:6px}
@@ -954,8 +957,133 @@ function planFor(group,sess){
 /* ================= état (enregistré dans ce navigateur) ================= */
 const store = {
   get(k,d){try{const v=localStorage.getItem('agm2:'+k);return v?JSON.parse(v):d}catch(e){return d}},
-  set(k,v){try{localStorage.setItem('agm2:'+k,JSON.stringify(v))}catch(e){}}
+  set(k,v){try{localStorage.setItem('agm2:'+k,JSON.stringify(v))}catch(e){} if(SYNCED.has(k)) schedulePush();}
 };
+/* ================= Supabase : version en ligne (comptes + données partagées) ================= */
+const SB_URL='https://jvvvqzithtdqwuuccpqw.supabase.co', SB_KEY='sb_publishable_OFspRBYNKCzGhXn1jv_Qqg_9BDynze_';
+const QS=new URLSearchParams(location.search);
+const LIVE=!QS.has('demo') && (location.hostname==='estellelavenac.github.io' || QS.has('live'));
+const SYNCED=new Set(['kids','rsvp','reasons','regs','csel','appel','appelDone','badges','sent','plans']);
+let sb=null, me=null, allKids=[], last={}, pushT=null, pushing=null, auth={step:'email',email:'',busy:false,err:''};
+const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)});
+const cut1=s=>{const i=s.indexOf('|');return [s.slice(0,i),s.slice(i+1)]};
+const cutLast=s=>{const i=s.lastIndexOf('|');return [s.slice(0,i),s.slice(i+1)]};
+const kidBy=(g,name)=>allKids.find(k=>k.group===g&&k.name===name);
+const kidById=id=>allKids.find(k=>k.id===id);
+const TABLES={
+  kids:{pk:['id'],rows:()=>kids.filter(k=>k.name).map(k=>({id:k.id,name:k.name,grp:k.group}))},
+  attendance:{pk:['kid_id','session_key'],rows:()=>Object.entries(rsvp).filter(([,v])=>v).map(([k,v])=>{const [kid_id,session_key]=cut1(k);return {kid_id,session_key,status:v,reason:reasons[k]||null}})},
+  event_regs:{pk:['kid_id','event_id'],rows:()=>Object.entries(regs).map(([k,v])=>{const [kid_id,event_id]=cut1(k);return {kid_id,event_id,status:v&&v.status==='no'?'no':'yes',guests:(v&&v.guests)||0}})},
+  docs_sent:{pk:['kid_id','doc_id'],rows:()=>Object.keys(sent).map(k=>{const [kid_id,doc_id]=cut1(k);return {kid_id,doc_id}})},
+  selections:{pk:['kid_id','event_id'],coach:true,rows:()=>Object.entries(csel).map(([k,v])=>{const [ev,rest]=cut1(k);const [g,name]=cut1(rest);const kd=kidBy(g,name);return kd&&{kid_id:kd.id,event_id:ev,selected:!!v}}).filter(Boolean)},
+  roll_call:{pk:['kid_id','session_key'],coach:true,rows:()=>Object.entries(appel).map(([k,v])=>{const [g,rest]=cut1(k);const [sk,name]=cutLast(rest);const kd=kidBy(g,name);return kd&&{kid_id:kd.id,session_key:sk,present:!!v}}).filter(Boolean)},
+  roll_call_done:{pk:['grp','session_key'],coach:true,rows:()=>Object.keys(appelDone).map(k=>{const [grp,session_key]=cut1(k);return {grp,session_key}})},
+  badges:{pk:['kid_id','skill_id'],coach:true,rows:()=>Object.entries(badges).flatMap(([k,arr])=>{const [g,name]=cut1(k);const kd=kidBy(g,name);return kd?(arr||[]).map(skill_id=>({kid_id:kd.id,skill_id})):[]})},
+  plans:{pk:['grp','session_key'],coach:true,rows:()=>Object.entries(customPlans).map(([k,content])=>{const [grp,session_key]=cut1(k);return {grp,session_key,content}})},
+};
+const pkOf=(def,r)=>def.pk.map(c=>r[c]).join('§');
+const snap=t=>{const def=TABLES[t],o={};def.rows().forEach(r=>o[pkOf(def,r)]=JSON.stringify(r));return o};
+function schedulePush(){ if(!LIVE||!me) return; clearTimeout(pushT); pushT=setTimeout(()=>{pushT=null; pushing=push().finally(()=>{pushing=null})},350); }
+async function push(){
+  if(!sb||!me) return; let failed=false;
+  for(const [t,def] of Object.entries(TABLES)){
+    if(def.coach&&me.role!=='coach') continue;
+    const now=snap(t), prev=last[t]||{};
+    const up=Object.keys(now).filter(k=>prev[k]!==now[k]).map(k=>JSON.parse(now[k]));
+    const del=Object.keys(prev).filter(k=>!(k in now)).map(k=>JSON.parse(prev[k]));
+    if(!up.length&&!del.length) continue;
+    try{
+      if(up.length){ const {error}=await sb.from(t).upsert(up,{onConflict:def.pk.join(',')}); if(error) throw error; }
+      for(const r of del){ const m={}; def.pk.forEach(c=>m[c]=r[c]); const {error}=await sb.from(t).delete().match(m); if(error) throw error; }
+      last[t]=now;
+    }catch(e){ failed=true; console.warn('sync',t,e); }
+  }
+  if(failed){ toast('⚠️ Pas de connexion : on réessaie dans un instant'); clearTimeout(pushT); pushT=setTimeout(()=>{pushT=null;pushing=push().finally(()=>{pushing=null})},8000); }
+}
+async function pull(){
+  if(!sb||!me) return;
+  if(pushT){ clearTimeout(pushT); pushT=null; pushing=push().finally(()=>{pushing=null}); }
+  if(pushing) await pushing;
+  const q=async t=>{const {data,error}=await sb.from(t).select('*'); if(error) throw error; return data||[]};
+  const [K,A,E,D,S,R,RD,B,PL]=await Promise.all(['kids','attendance','event_regs','docs_sent','selections','roll_call','roll_call_done','badges','plans'].map(q));
+  allKids=K.map(k=>({id:k.id,name:k.name,group:k.grp,parent:k.parent_id})).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const own=allKids.filter(k=>k.parent===me.id).map(({id,name,group})=>({id,name,group}));
+  const blank=kids.find(k=>!k.name&&!kidById(k.id));
+  kids=own.length?own:[blank||{id:uuid(),name:'',group:'GAF 1'}];
+  if(!kids.some(k=>k.id===activeKid)) activeKid=kids[0].id;
+  rsvp={}; reasons={}; A.forEach(r=>{const k=`${r.kid_id}|${r.session_key}`; rsvp[k]=r.status; if(r.reason) reasons[k]=r.reason;});
+  regs={}; E.forEach(r=>{regs[`${r.kid_id}|${r.event_id}`]=r.status==='no'?{status:'no'}:{status:'yes',guests:r.guests||0}});
+  sent={}; D.forEach(r=>{sent[`${r.kid_id}|${r.doc_id}`]='Envoyé'});
+  csel={}; S.forEach(r=>{const kd=kidById(r.kid_id); if(kd) csel[`${r.event_id}|${kd.group}|${kd.name}`]=r.selected});
+  appel={}; R.forEach(r=>{const kd=kidById(r.kid_id); if(kd) appel[`${kd.group}|${r.session_key}|${kd.name}`]=r.present});
+  appelDone={}; RD.forEach(r=>{appelDone[`${r.grp}|${r.session_key}`]=1});
+  badges={}; B.forEach(r=>{const kd=kidById(r.kid_id); if(kd){const k=`${kd.group}|${kd.name}`;(badges[k]=badges[k]||[]).push(r.skill_id)}});
+  customPlans={}; PL.forEach(r=>{customPlans[`${r.grp}|${r.session_key}`]=r.content});
+  last={}; Object.keys(TABLES).forEach(t=>last[t]=snap(t));
+}
+const busyUI=()=>document.getElementById('layer').innerHTML||(onb&&!LIVE)||document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+async function refresh(){ if(!me||busyUI()||onb) return; try{ await pull(); if(!busyUI()&&!onb) render(); }catch(e){ console.warn(e); } }
+function loadSb(){ return window.supabase?Promise.resolve():new Promise((ok,ko)=>{const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js'; s.onload=ok; s.onerror=ko; document.head.appendChild(s);}); }
+function renderAuth(){
+  const host=document.getElementById('onb'); const a=auth;
+  const body=a.step==='email'
+    ?`<img class="logo" src="${LOGO}" alt="" width="130" height="130"><h1 class="hello">Bienvenue à <span class="script">l’AGM</span> !</h1>
+      <p>Entre ton e-mail : on t’envoie un code pour te connecter. Pas de mot de passe à retenir.</p>
+      <div class="field"><label for="authEmail">Ton e-mail</label><input id="authEmail" type="email" inputmode="email" autocomplete="email" required value="${esc(a.email)}" placeholder="prenom@exemple.fr"></div>`
+    :`<div class="onb-art" style="font-size:72px" aria-hidden="true">📬</div><h1 class="hello">Ton <span class="script">code</span></h1>
+      <p>On vient d’envoyer un code à <b>${esc(a.email)}</b>. Regarde aussi dans les spams.</p>
+      <div class="field"><label for="authCode">Code reçu par e-mail</label><input id="authCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required style="letter-spacing:.3em;text-align:center;font-size:26px"></div>
+      <button type="button" class="link" data-authback>Changer d’e-mail ou renvoyer un code</button>`;
+  host.innerHTML=`<form class="onb" id="authForm" role="dialog" aria-modal="true" aria-label="Connexion" novalidate>
+    <div class="onb-top"><span></span><span></span></div>
+    <div class="onb-body">${body}${a.err?`<p class="auth-err" role="alert">${esc(a.err)}</p>`:''}</div>
+    <button class="btn big" type="submit" ${a.busy?'disabled':''}>${a.busy?'Un instant…':a.step==='email'?'Recevoir mon code':'Me connecter'}</button></form>`;
+  const f=host.querySelector('input'); f&&setTimeout(()=>f.focus(),50);
+}
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='authForm') return; e.preventDefault(); if(auth.busy) return; auth.err='';
+  if(auth.step==='email'){
+    const v=document.getElementById('authEmail').value.trim().toLowerCase();
+    if(!/^\S+@\S+\.\S+$/.test(v)){ auth.err='Cette adresse e-mail ne semble pas valide.'; return renderAuth(); }
+    auth.email=v; auth.busy=true; renderAuth();
+    const {error}=await sb.auth.signInWithOtp({email:v,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname}});
+    auth.busy=false; if(error){ auth.err=/rate|limit|seconds/i.test(error.message)?'Trop de demandes : attends une minute avant de redemander un code.':'Impossible d’envoyer le code. Vérifie ton adresse et réessaie.'; }
+    else auth.step='code';
+    renderAuth();
+  } else {
+    const c=document.getElementById('authCode').value.replace(/\D/g,'');
+    if(c.length<6){ auth.err='Le code contient au moins 6 chiffres.'; return renderAuth(); }
+    auth.busy=true; renderAuth();
+    const {data,error}=await sb.auth.verifyOtp({email:auth.email,token:c,type:'email'});
+    auth.busy=false; if(error||!data||!data.user){ auth.err='Code incorrect ou expiré. Vérifie le dernier e-mail reçu.'; return renderAuth(); }
+    await afterLogin(data.user);
+  }
+});
+document.addEventListener('click',e=>{ if(e.target.closest('[data-authback]')){ auth={step:'email',email:auth.email,busy:false,err:''}; renderAuth(); }
+  if(e.target.closest('[data-logout]')){ e.preventDefault(); logout(); } });
+async function afterLogin(user){
+  if(me&&me.id===user.id) return;
+  me={id:user.id,email:user.email,role:'parent'};
+  try{ const {data}=await sb.from('profiles').select('role,display_name').eq('id',user.id).maybeSingle(); if(data) me.role=data.role; }catch(e){}
+  coachOn=me.role==='coach';
+  try{ await pull(); }catch(err){ console.warn(err); toast('⚠️ Connexion au club impossible pour le moment'); }
+  document.getElementById('onb').innerHTML='';
+  onb=(!kids.some(k=>k.name)&&me.role!=='coach')?{step:1,name:'',group:'GAF 1'}:null;
+  if(me.role==='coach'&&!kids.some(k=>k.name)) location.hash='coachs';
+  render();
+}
+async function logout(){ if(pushing) await pushing; try{ await sb.auth.signOut(); }catch(e){} me=null; coachOn=false; auth={step:'email',email:'',busy:false,err:''}; location.hash='accueil'; renderAuth(); }
+async function liveBoot(){
+  document.body.classList.add('live'); onb=null;
+  try{ await loadSb(); }catch(e){ document.getElementById('view').innerHTML='<div class="empty" style="margin-top:30vh">Impossible de charger l’appli : vérifie ta connexion puis recharge la page.</div>'; return; }
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  const {data:{session}}=await sb.auth.getSession();
+  if(session) await afterLogin(session.user); else renderAuth();
+  sb.auth.onAuthStateChange((ev,s)=>{ if(ev==='SIGNED_IN'&&s&&!me) afterLogin(s.user); });
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refresh(); });
+  setInterval(()=>{ if(document.visibilityState==='visible') refresh(); },30000);
+}
+
 let kids = store.get('kids',[{id:'k1',name:'Lia',group:'GAF 1'}]);
 let activeKid = store.get('active',kids[0].id);
 let rsvp = store.get('rsvp',{});
@@ -1204,14 +1332,14 @@ let appel=store.get('appel',{}), appelDone=store.get('appelDone',{}), customPlan
 let badges=store.get('badges',{'GAF 1|Lia':['rav','chd','sext']}), badgeGym=null, draft=null, picker=false;
 function roster(g){
   const baby=catOf(g)==='Babies', pool=baby?BNAMES:NAMES, off=Object.keys(GROUPS).filter(x=>catOf(x)===catOf(g)).indexOf(g)*(baby?6:14); const n=GROUPS[g].effectif;
-  const real=kids.filter(k=>k.group===g).map(k=>({name:k.name,kid:k}));
+  const real=(LIVE?allKids:kids).filter(k=>k.group===g&&k.name).map(k=>({name:k.name,kid:k})); if(LIVE) return real.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const others=[...pool.slice(off),...pool.slice(0,off)].slice(0,n).filter(x=>!real.some(r=>r.name===x)).slice(0,n-real.length).map((name,i)=>({name,i}));
   return [...real,...others].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
 }
 /* ================= sélection compétitions (coachs) ================= */
 let csel=store.get('csel',{}), coachEv=store.get('cev','e5');
 const COMPETS=()=>EVENTS.filter(e=>e.kind==='compet');
-function isSel(evId,g,name){const k=`${evId}|${g}|${name}`; if(k in csel) return csel[k]; const gym=roster(g).find(x=>x.name===name); return !gym||gym.kid?true:(gym.i%3!==2);}
+function isSel(evId,g,name){const k=`${evId}|${g}|${name}`; if(k in csel) return csel[k]; if(LIVE) return false; const gym=roster(g).find(x=>x.name===name); return !gym||gym.kid?true:(gym.i%3!==2);}
 function selStatus(evId,g,gym){
   if(gym.kid){const r=regs[`${gym.kid.id}|${evId}`]; return r?(r.status==='no'?'no':'yes'):null;}
   const n=(gym.i*7+evId.charCodeAt(1))%6; return n<3?'yes':n===3?'no':null;
@@ -1278,6 +1406,8 @@ function coachBadges(g){
 let coachOn=false, pin='';
 const COACH_PIN='2026'; /* démo uniquement : dans la vraie appli, chaque coach a son compte */
 function vLock(){
+  if(LIVE) return `<div class="lock"><img class="logo" src="${LOGO}" alt="" width="96" height="96"><h1 class="hello">Espace <span class="script">coachs</span></h1>
+  <p class="hint" style="text-align:center">🔒 Réservé aux coachs du club. Ton compte (${esc(me?me.email:'')}) n’est pas encore activé comme coach : demande au club de l’activer.</p><a class="btn" href="#accueil">Retour à l’espace parent</a></div>`;
   return `<div class="lock"><img class="logo" src="${LOGO}" alt="" width="96" height="96"><h1 class="hello">Espace <span class="script">coachs</span></h1>
   <p class="hint" style="text-align:center">🔒 Réservé aux coachs du club. Entre ton code.</p>
   <div class="pin-dots" aria-live="polite">${[0,1,2,3].map(i=>`<i class="${i<pin.length?'on':''}"></i>`).join('')}</div>
@@ -1289,12 +1419,12 @@ function vCoachs(){
   const g=coachGroup; const s=coachNext(g);
   const tabs=[['appel','✓ Appel'],['prog','🗒️ Prog.'],['compet','🏅 Compét'],['badges','★ Badges']];
   return `
-  <div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span><button class="link" data-coachout>🔒 Verrouiller</button></div>
+  <div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span>${LIVE?'<button class="link" data-logout>Se déconnecter</button>':'<button class="link" data-coachout>🔒 Verrouiller</button>'}</div>
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
   <div class="seg four" role="tablist">${tabs.map(([id,l])=>`<button role="tab" data-ctab="${id}" aria-selected="${coachTab===id}">${l}</button>`).join('')}</div>
-  <section class="card coach-card">${coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
+  <section class="card coach-card">${LIVE&&!roster(g).length?'<div class="empty">Aucune gymnaste inscrite dans ce groupe pour l’instant. Elles apparaissent ici dès que leurs parents créent leur compte.</div>':coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
   <p class="proto">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
 }
 function myBadges(k){
@@ -1506,7 +1636,7 @@ function vHub(seg){
   const docsTodo=TODO_DOCS.filter(d=>!(sent[`${kid().id}|${d.id}`]||d.init==='done')).length;
   return `<div class="club-head"><img class="logo" src="${LOGO}" alt="" width="64" height="64"><h1 class="hello">Le <span class="script">club</span></h1></div>
   <div class="seg" role="tablist">${segs.map(([id,l])=>`<a role="tab" href="#${id==='infos'?'club':id}" aria-selected="${seg===id}">${l}${id==='docs'&&docsTodo?` <i class="dotbadge">${docsTodo}</i>`:''}</a>`).join('')}</div>
-  ${strip(seg==='photos'?vPhotos():seg==='docs'?vDocs():vClub())}`;
+  ${strip(seg==='photos'?vPhotos():seg==='docs'?vDocs():vClub())}${LIVE&&me?`<p class="acct">Connecté·e avec ${esc(me.email)} · <a href="#" data-logout>Se déconnecter</a></p>`:''}`;
 }
 function render(){
   applyTheme(); applyLook();
@@ -1528,6 +1658,7 @@ function render(){
 /* ================= premier lancement guidé ================= */
 function renderOnb(){
   const host=document.getElementById('onb');
+  if(LIVE&&!me){ renderAuth(); return; }
   if(!onb){ host.innerHTML=''; return; }
   const st=onb.step; const l=look(kid());
   const dots=`<div class="onb-dots">${[0,1,2].map(i=>`<i class="${i===st?'on':''}"></i>`).join('')}</div>`;
@@ -1540,7 +1671,7 @@ function renderOnb(){
      <div class="rsvp demo"><span class="yes on">${I.yes}Oui</span><span class="no">${I.no}Non</span></div>`,
   ];
   host.innerHTML=`<div class="onb" role="dialog" aria-modal="true" aria-label="Présentation">
-    <div class="onb-top">${st>0?'<button class="link" data-onb="back">‹ Retour</button>':'<span></span>'}<button class="link" data-onb="skip">Passer</button></div>
+    <div class="onb-top">${st>0?'<button class="link" data-onb="back">‹ Retour</button>':'<span></span>'}${LIVE?'<span></span>':'<button class="link" data-onb="skip">Passer</button>'}</div>
     <div class="onb-body">${screens[st]}</div>
     ${dots}<button class="btn big" data-onb="next">${st<2?'Suivant':'C’est parti ! 🤸'}</button></div>`;
 }
@@ -1590,7 +1721,7 @@ document.addEventListener('click',e=>{
     if(pin.length===4){ if(pin.length===4){ const r=b.getBoundingClientRect(); coachOn=true; pin=''; render(); burst(r); toast('👋 Bienvenue coach !'); return; } render(); setTimeout(()=>{pin='';if(route()==='coachs'&&!coachOn)render()},700); toast('Code incorrect'); return; }
     render(); }
   else if('coachout' in d){ coachOn=false; pin=''; location.hash='accueil'; toast('🔒 Espace coachs verrouillé'); }
-  else if(d.onb){ if(d.onb==='back'){onb.step--} else if(d.onb==='skip'||(d.onb==='next'&&onb.step===2)){ const k=kids[0]; if(onb.name.trim()) k.name=onb.name.trim(); k.group=onb.group; activeKid=k.id; save(); store.set('onb2',true); const fin=d.onb==='next'; onb=null; location.hash='accueil'; render(); if(fin){burst(b.getBoundingClientRect());toast(`🎉 Bienvenue ${kids[0].name} !`)} return; } else {onb.step++} renderOnb(); }
+  else if(d.onb){ if(LIVE&&d.onb!=='back'&&!onb.name.trim()){ onb.step=1; renderOnb(); toast('Indique le prénom de ton enfant'); return; } if(d.onb==='back'){onb.step--} else if(d.onb==='skip'||(d.onb==='next'&&onb.step===2)){ const k=kids[0]; if(onb.name.trim()) k.name=onb.name.trim(); k.group=onb.group; activeKid=k.id; save(); store.set('onb2',true); const fin=d.onb==='next'; onb=null; location.hash='accueil'; render(); if(fin){burst(b.getBoundingClientRect());toast(`🎉 Bienvenue ${kids[0].name} !`)} return; } else {onb.step++} renderOnb(); }
   else if(d.onbgroup){ onb.group=d.onbgroup; renderOnb(); }
   else if('replay' in d){ onb={step:0,name:kid().name,group:kid().group}; renderOnb(); }
   else if('themeToggle' in d){ theme=isDark()?'light':'dark'; store.set('theme',theme); render(); }
@@ -1645,11 +1776,11 @@ document.addEventListener('submit',e=>{
   if(e.target.id==='composer'){ e.preventDefault(); sendMsg(document.getElementById('msgIn').value); return; }
   if(e.target.id!=='kidForm') return; e.preventDefault();
   const name=document.getElementById('kname').value.trim(); if(!name) return;
-  const group=new FormData(e.target).get('grp'); const id='k'+Date.now();
+  const group=new FormData(e.target).get('grp'); const id=LIVE?uuid():'k'+Date.now();
   kids.push({id,name,group}); activeKid=id; save(); closeSheet(); render(); toast(`👋 Bienvenue ${name} !`);
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSheet();render()} if(lbIndex!==null&&document.querySelector('.lb')&&(e.key==='ArrowRight'||e.key==='ArrowLeft')){const n=albumPhotos().length;openLb((lbIndex+(e.key==='ArrowRight'?1:-1)+n)%n)}});
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0)});
 document.getElementById("sideLogo").src=LOGO;
-render();
+if(LIVE) liveBoot(); else render();
 </script>

@@ -2,7 +2,8 @@
 
 Prototype cliquable d'une application mobile et desktop pour l'Académie Gymnique Méditerranée.
 
-**Voir l'appli :** ouvrir `index.html` dans un navigateur, ou la version en ligne : https://estellelavenac.github.io/agm-gym/
+**L'appli du club (comptes réels) :** https://estellelavenac.github.io/agm-gym/  
+**Démo sans compte :** https://estellelavenac.github.io/agm-gym/?demo
 
 ## Ce que l'appli propose
 - **Deux espaces**, toujours visibles en haut de l'écran : Parent (violet) et Coach (turquoise, protégé par un code).
@@ -21,6 +22,6 @@ Prototype cliquable d'une application mobile et desktop pour l'Académie Gymniqu
 Après un test avec une coach et une aidante : l'espace gymnaste a été retiré, et le programme du cours n'est plus montré aux familles (il peut changer le jour J, et une séance annoncée puis modifiée déçoit les enfants).
 
 ## À savoir
-Il s'agit d'une ébauche de démonstration. Les horaires 2026-2027 sont réels. Les événements, les montants, les messages, les photos et les documents sont des exemples. Les réponses restent enregistrées sur l'appareil de la personne qui teste. Espace coachs : n'importe quel code à 4 chiffres.
+Version en ligne : connexion par code reçu par e-mail, données partagées entre parents et coachs via Supabase (voir `supabase/schema.sql`). Dans la démo (`?demo`) : Les horaires 2026-2027 sont réels. Les événements, les montants, les messages, les photos et les documents sont des exemples. Les réponses restent enregistrées sur l'appareil de la personne qui teste. Espace coachs : n'importe quel code à 4 chiffres.
 
 Conception : Estelle Lavenac
