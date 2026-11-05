@@ -1037,16 +1037,16 @@ function renderAuth(){
   const host=document.getElementById('onb'); const a=auth;
   const body=a.step==='email'
     ?`<img class="logo" src="${LOGO}" alt="" width="130" height="130"><h1 class="hello">Bienvenue à <span class="script">l’AGM</span> !</h1>
-      <p>Entre ton e-mail : on t’envoie de quoi te connecter. Pas de mot de passe à retenir.</p>
+      <p>Entre ton e-mail : on t’envoie un code pour te connecter. Pas de mot de passe à retenir.</p>
       <div class="field"><label for="authEmail">Ton e-mail</label><input id="authEmail" type="email" inputmode="email" autocomplete="email" required value="${esc(a.email)}" placeholder="prenom@exemple.fr"></div>`
-    :`<div class="onb-art" style="font-size:72px" aria-hidden="true">📬</div><h1 class="hello">Regarde tes <span class="script">e-mails</span></h1>
-      <p>On vient d’envoyer un e-mail à <b>${esc(a.email)}</b> (pense aux spams). <b>Clique sur le lien</b> qu’il contient, ou entre ici le code s’il y en a un.</p>
-      <div class="field"><label for="authCode">Code reçu par e-mail (si l’e-mail en contient un)</label><input id="authCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required style="letter-spacing:.3em;text-align:center;font-size:26px"></div>
+    :`<div class="onb-art" style="font-size:72px" aria-hidden="true">📬</div><h1 class="hello">Ton <span class="script">code</span></h1>
+      <p>On vient d’envoyer un code à <b>${esc(a.email)}</b>. Regarde aussi dans les spams.</p>
+      <div class="field"><label for="authCode">Code reçu par e-mail</label><input id="authCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required style="letter-spacing:.3em;text-align:center;font-size:26px"></div>
       <button type="button" class="link" data-authback>Changer d’e-mail ou renvoyer un code</button>`;
   host.innerHTML=`<form class="onb" id="authForm" role="dialog" aria-modal="true" aria-label="Connexion" novalidate>
     <div class="onb-top"><span></span><span></span></div>
     <div class="onb-body">${body}${a.err?`<p class="auth-err" role="alert">${esc(a.err)}</p>`:''}</div>
-    <button class="btn big" type="submit" ${a.busy?'disabled':''}>${a.busy?'Un instant…':a.step==='email'?'Recevoir mon lien de connexion':'Valider le code'}</button></form>`;
+    <button class="btn big" type="submit" ${a.busy?'disabled':''}>${a.busy?'Un instant…':a.step==='email'?'Recevoir mon code':'Me connecter'}</button></form>`;
   const f=host.querySelector('input'); f&&setTimeout(()=>f.focus(),50);
 }
 document.addEventListener('submit',async e=>{
