@@ -10,10 +10,13 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="AGM Gym">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Caveat:wght@600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap">
+<script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));</script>
 <style>
 /* Layout: app shell — sidebar on desktop, bottom tab bar on phone; one "next class" hero in the club's night-sky look, then lists. */
 :root{
@@ -223,6 +226,12 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .grp-row{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;padding:10px 12px;border-radius:var(--r-sm);background:var(--surface-2)}
 .grp-row b{font-family:var(--f-display);font-size:17px;color:var(--violet)}
 .grp-row small{color:var(--muted);font-weight:700}
+.grp-cat,.opt-cat{font-family:var(--f-display);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 2px 2px}
+.grp-cat:first-child,.opt-cat:first-child{margin-top:0}
+.opt-cat+.opts{margin-bottom:6px}
+.chip-cat{flex:none;align-self:center;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px 0 6px}
+.chip-cat:first-child{padding-left:0}
+.agetag{display:inline-block;font-size:11.5px;font-weight:800;color:var(--violet);background:color-mix(in srgb,var(--violet) 12%,transparent);padding:2px 8px;border-radius:999px;line-height:1.35;text-align:center}
 
 /* ---------- coach ---------- */
 .coach{display:grid;gap:12px;grid-template-columns:1fr}
@@ -326,7 +335,7 @@ fieldset{border:0;padding:0;margin:0}
 .plan p{color:var(--muted)}
 .bag{display:flex;gap:8px;flex-wrap:wrap}
 .bag span{background:var(--surface-2);border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px}
-.opts.three{grid-template-columns:repeat(3,1fr)}
+.opts.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .opts.three .opt{flex-direction:column;align-items:center;text-align:center;gap:6px}
 .opts.three .opt div{align-items:center}
 .slogan{background:var(--violet-soft);border-color:transparent}
@@ -595,7 +604,7 @@ body.kidmode .wrap{max-width:720px}
 .onb-body .logo{width:150px}
 .onb-body .field{width:100%;text-align:left}
 .onb-body .field input{font-size:18px;padding:14px}
-.onb-body .opts.three{width:100%;grid-template-columns:repeat(3,1fr)}
+.onb-body .opts.three{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
 .opt.grp{flex-direction:column;align-items:center;background:var(--surface)}
 .opt.grp.on{border-color:var(--violet);background:var(--violet-soft)}
 .onb-art .ico.huge{width:130px;height:130px}
@@ -838,6 +847,12 @@ const GROUPS = {
   'GAF 1': {level:'Avancée', n:3, years:'Nées en 2017 à 2020', perWeek:'2 cours / semaine', slots:[{d:1,s:'18:15',e:'20:30'},{d:3,s:'11:00',e:'12:00'}], effectif:14},
   'GAF 2': {level:'Intermédiaire', n:2, years:'Nées en 2017 à 2020', perWeek:'1 cours / semaine', slots:[{d:1,s:'17:00',e:'18:30'}], effectif:16},
   'GAF 3': {level:'Débutante', n:1, years:'Nées en 2017 à 2020', perWeek:'1 cours / semaine', slots:[{d:3,s:'10:15',e:'11:15'}], effectif:12},
+  'B1': {cat:'Babies', level:'Baby gym', age:'Dès 15 mois', years:'Nés en 2024', perWeek:'1 cours / semaine', slots:[{d:6,s:'09:00',e:'09:45'}], effectif:10},
+  'B2': {cat:'Babies', level:'Baby gym', age:'Dès 15 mois', years:'Nés en 2024', perWeek:'1 cours / semaine', slots:[{d:6,s:'09:50',e:'10:35'}], effectif:10},
+  'B3': {cat:'Babies', level:'Baby gym', age:'3 ans', years:'Nés en 2023', perWeek:'1 cours / semaine', slots:[{d:6,s:'10:40',e:'11:25'}], effectif:12},
+  'B4': {cat:'Babies', level:'Baby gym', age:'3 ans', years:'Nés en 2023', perWeek:'1 cours / semaine', slots:[{d:3,s:'14:00',e:'14:45'}], effectif:12},
+  'B5': {cat:'Babies', level:'Baby gym', age:'4 – 5 ans', years:'Nés en 2021 et 2022', perWeek:'1 cours / semaine', slots:[{d:3,s:'14:50',e:'15:45'}], effectif:12},
+  'B6': {cat:'Babies', level:'Baby gym', age:'4 – 5 ans', years:'Nés en 2021 et 2022', perWeek:'1 cours / semaine', slots:[{d:6,s:'11:30',e:'12:25'}], effectif:12},
 };
 const PLACE = "Cuers · L'Oustau per touti";
 const HOLIDAYS = [
@@ -852,11 +867,11 @@ const FERIES = {'2026-11-11':'Armistice','2026-12-25':'Noël','2027-01-01':'Jour
 const EVENTS = [
   {id:'e1',kind:'fort',date:'2026-11-21',time:'10:00 – 12:00',title:'Matinée « Viens gym avec moi »',text:'Les parents passent de l’autre côté de la barrière et font la séance avec leur gymnaste.',groups:'all',cap:40,taken:23,guests:true,price:'Gratuit'},
   {id:'e2',kind:'fort',date:'2026-12-05',time:'14:00 – 17:00',title:'Défi Téléthon',text:'Parcours gym ouvert à toute la famille, au profit du Téléthon.',groups:'all',cap:80,taken:31,guests:true,price:'Don libre'},
-  {id:'e3',kind:'fort',date:'2026-12-16',time:'10:00 – 12:00',title:'Fête de Noël du club',text:'Démonstration des groupes GAF puis goûter. Chaque famille apporte un gâteau ou une boisson.',groups:'all',cap:120,taken:64,guests:true,price:'Gratuit'},
+  {id:'e3',kind:'fort',date:'2026-12-16',time:'10:00 – 12:00',title:'Fête de Noël du club',text:'Démonstration des groupes GAF et Babies puis goûter. Chaque famille apporte un gâteau ou une boisson.',groups:'all',cap:120,taken:64,guests:true,price:'Gratuit'},
   {id:'e4',kind:'stage',date:'2026-12-21',end:'2026-12-23',time:'9:00 – 12:00',title:'Stage de Noël GAF',text:'Trois matinées pour travailler poutre et sol, avec un mini-show le dernier jour.',groups:['GAF 1','GAF 2','GAF 3'],cap:24,taken:17,price:'45 € les 3 matinées'},
-  {id:'e5',kind:'compet',date:'2027-01-24',time:'Journée',title:'Compétition départementale FFGym',text:'1ʳᵉ compétition de la saison. Les coachs ont fait la sélection : il reste à confirmer la présence. Convocation et horaires de passage envoyés 10 jours avant.',groups:'all',cap:14,taken:9,price:'Engagement 15 €'},
+  {id:'e5',kind:'compet',date:'2027-01-24',time:'Journée',title:'Compétition départementale FFGym',text:'1ʳᵉ compétition de la saison. Les coachs ont fait la sélection : il reste à confirmer la présence. Convocation et horaires de passage envoyés 10 jours avant.',groups:['GAF 1','GAF 2','GAF 3'],cap:14,taken:9,price:'Engagement 15 €'},
   {id:'e6',kind:'stage',date:'2027-02-22',end:'2027-02-24',time:'9:00 – 12:00',title:'Stage d’hiver',text:'Acrobatie, souplesse et jeux d’équipe. Ouvert aux gymnastes GAF de tous niveaux.',groups:['GAF 1','GAF 2','GAF 3'],cap:24,taken:4,price:'45 € les 3 matinées'},
-  {id:'e7',kind:'compet',date:'2027-03-21',time:'Journée',title:'Compétition interclubs du Var',text:'2ᵉ compétition de la saison, avec les clubs du Var. Les coachs ont fait la sélection : il reste à confirmer la présence.',groups:'all',cap:28,taken:6,price:'Engagement 15 €'},
+  {id:'e7',kind:'compet',date:'2027-03-21',time:'Journée',title:'Compétition interclubs du Var',text:'2ᵉ compétition de la saison, avec les clubs du Var. Les coachs ont fait la sélection : il reste à confirmer la présence.',groups:['GAF 1','GAF 2','GAF 3'],cap:28,taken:6,price:'Engagement 15 €'},
   {id:'e8',kind:'fort',date:'2027-06-19',time:'15:00',title:'Gala de fin d’année',text:'Le grand spectacle de la saison, tous les groupes sur scène. Billetterie familles.',groups:'all',cap:300,taken:12,guests:true,price:'5 € la place adulte'},
 ];
 const KIND = {stage:'Stage',compet:'Compétition',fort:'Temps fort'};
@@ -999,6 +1014,10 @@ const EXTRA = [];
 
 /* ================= composants ================= */
 const stars = n => `<span class="stars" aria-label="niveau ${n} sur 3">${'★'.repeat(n)}<span class="off">${'★'.repeat(3-n)}</span></span>`;
+const catOf = n => GROUPS[n].cat||'GAF';
+const CATS = ['GAF','Babies'];
+const grpTag = n => catOf(n)==='Babies' ? `<span class="agetag">${GROUPS[n].age}</span>` : stars(GROUPS[n].n);
+const byCat = (fn, head) => CATS.map(c=>{const list=Object.keys(GROUPS).filter(n=>catOf(n)===c); return head(c,list.map(fn).join(''))}).join('');
 const statusPill = st => st==='yes'?'<span class="pill ok">✓ Présente</span>':st==='no'?'<span class="pill no">Absente</span>':'<span class="pill wait">? À répondre</span>';
 const cap1 = s => s.replace(/^./,c=>c.toUpperCase());
 const ico = (k,cls='') => `<span class="ico ${cls}" style="--c:${APPARATUS[k].col}"><svg viewBox="0 0 100 100">${APPARATUS[k].svg}</svg></span>`;
@@ -1083,7 +1102,7 @@ function vAccueil(){
 }
 function todoList(k,real){
   const items=[];
-  COMPETS().filter(e=>parse(e.date)>=today&&isSel(e.id,k.group,k.name)&&!regs[`${k.id}|${e.id}`]).forEach(e=>
+  COMPETS().filter(e=>parse(e.date)>=today&&forGroup(e,k.group)&&isSel(e.id,k.group,k.name)&&!regs[`${k.id}|${e.id}`]).forEach(e=>
     items.push({ic:'🏅',t:`Confirmer la présence de ${esc(k.name)}`,sub:`${e.title} · ${fr(parse(e.date),{day:'numeric',month:'short'})}`,attr:`data-ev="${e.id}"`,hot:true}));
   TODO_DOCS.filter(d=>!(sent[`${k.id}|${d.id}`]||d.init==='done')).forEach(d=>
     items.push({ic:d.ic,t:d.name,sub:d.due?`À donner avant le ${d.due}`:'À donner au club',href:'#docs'}));
@@ -1154,7 +1173,7 @@ function vClub(){
   <div class="club-head"><img class="logo" src="${LOGO}" alt="Logo de l’Académie Gymnique Méditerranée" width="120" height="120"><h1 class="hello">Le <span class="script">club</span></h1></div>
   <div class="cards">
     <section class="card"><h3>Les groupes</h3>
-      <div class="grp-table">${Object.entries(GROUPS).map(([n,g])=>`<div class="grp-row"><b>${n}</b><span>${stars(g.n)}</span><small class="tnum">${g.slots.map(s=>`${['dim','lun','mar','mer','jeu','ven','sam'][s.d]}. ${hhmm(s.s)}`).join(' · ')}</small><small>${g.level}</small></div>`).join('')}</div></section>
+      <div class="grp-table">${byCat(n=>{const g=GROUPS[n];return `<div class="grp-row"><b>${n}</b><span>${grpTag(n)}</span><small class="tnum">${g.slots.map(s=>`${['dim','lun','mar','mer','jeu','ven','sam'][s.d]}. ${hhmm(s.s)}`).join(' · ')}</small><small>${g.level}</small></div>`},(c,h)=>`<div class="grp-cat">${c}</div>${h}`)}</div></section>
     <section class="card"><h3>Nous écrire</h3>
       <div class="row"><span class="mail" id="mail">academie.gym.med@gmail.com</span><button class="btn sm ghost" data-copy="mail">Copier</button></div>
       <h3>📍 Où ?</h3><div class="grp-table"><div class="grp-row"><b style="font-size:15px">Cuers</b><span>L’Oustau per touti</span></div><div class="grp-row"><b style="font-size:15px">Solliès-Toucas</b><span>Salle Lanza · Baby gym</span></div></div></section>
@@ -1173,6 +1192,7 @@ function vClub(){
 
 function seeded(g,i){let x=(g.charCodeAt(4)*97+i*31)%100;return x/100}
 /* ================= espace coachs ================= */
+const BNAMES=['Léo','Alba','Gabin','Rose','Malo','Jeanne','Noé','Lou','Sacha','Mila','Arthur','Nina','Paul','Romy','Timéo','Iris','Ezio','Lila','Nolan','Zélie','Louis','Ava','Marius','Anna','Elio','Lucie','Basile','Inaya','Raphaël','Suzanne','Côme','Olivia'];
 const NAMES=['Jade','Inès','Rose','Lou','Zoé','Emma','Léna','Chloé','Manon','Anna','Lina','Mia','Sofia','Alba','Nina','Romy','Ambre','Louise','Margaux','Iris','Julia','Lola','Elsa','Agathe','Mila','Capucine','Valentine','Clara','Héloïse','Maëlle','Céleste','Victoire','Juliette','Noémie','Ella','Rosalie','Lisa','Camille','Eva','Léonie','Alice','Jeanne'];
 const ELEMENTS=[
   {id:'rav',k:'sol',name:'Roulade avant'},{id:'rar',k:'sol',name:'Roulade arrière'},{id:'chd',k:'sol',name:'Chandelle'},{id:'pont',k:'sol',name:'Pont'},
@@ -1183,9 +1203,9 @@ let coachGroup=store.get('cgroup','GAF 1'), coachTab=store.get('ctab','appel'); 
 let appel=store.get('appel',{}), appelDone=store.get('appelDone',{}), customPlans=store.get('plans',{});
 let badges=store.get('badges',{'GAF 1|Lia':['rav','chd','sext']}), badgeGym=null, draft=null, picker=false;
 function roster(g){
-  const off=Object.keys(GROUPS).indexOf(g)*14; const n=GROUPS[g].effectif;
+  const baby=catOf(g)==='Babies', pool=baby?BNAMES:NAMES, off=Object.keys(GROUPS).filter(x=>catOf(x)===catOf(g)).indexOf(g)*(baby?6:14); const n=GROUPS[g].effectif;
   const real=kids.filter(k=>k.group===g).map(k=>({name:k.name,kid:k}));
-  const others=NAMES.slice(off,off+n).filter(x=>!real.some(r=>r.name===x)).slice(0,n-real.length).map((name,i)=>({name,i}));
+  const others=[...pool.slice(off),...pool.slice(0,off)].slice(0,n).filter(x=>!real.some(r=>r.name===x)).slice(0,n-real.length).map((name,i)=>({name,i}));
   return [...real,...others].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
 }
 /* ================= sélection compétitions (coachs) ================= */
@@ -1271,10 +1291,10 @@ function vCoachs(){
   return `
   <div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span><button class="link" data-coachout>🔒 Verrouiller</button></div>
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
-  <div class="filters" role="group" aria-label="Groupe">${Object.keys(GROUPS).map(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n} ${stars(GROUPS[n].n)}</button>`).join('')}</div>
+  <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
   <div class="seg four" role="tablist">${tabs.map(([id,l])=>`<button role="tab" data-ctab="${id}" aria-selected="${coachTab===id}">${l}</button>`).join('')}</div>
-  <section class="card coach-card">${coachTab==='compet'?coachCompet(g):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
+  <section class="card coach-card">${coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
   <p class="proto">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
 }
 function myBadges(k){
@@ -1438,7 +1458,7 @@ function kidSheet(){
   openSheet(`<h2>Ajouter un enfant</h2>
   <form id="kidForm" style="display:flex;flex-direction:column;gap:16px">
     <div class="field"><label for="kname">Prénom</label><input id="kname" required maxlength="20" placeholder="Prénom"></div>
-    <fieldset class="field"><legend>Son groupe</legend><div class="opts three">${Object.entries(GROUPS).map(([n,g],i)=>`<label class="opt"><input type="radio" name="grp" value="${n}" ${i===0?'checked':''}><div><b>${n}</b>${stars(g.n)}</div></label>`).join('')}</div></fieldset>
+    <fieldset class="field"><legend>Son groupe</legend>${byCat(n=>`<label class="opt"><input type="radio" name="grp" value="${n}" ${n==='GAF 1'?'checked':''}><div><b>${n}</b>${grpTag(n)}</div></label>`,(c,h)=>`<div class="opt-cat">${c}</div><div class="opts three">${h}</div>`)}</fieldset>
     <button class="btn big">Ajouter</button>
   </form>`);
 }
@@ -1515,7 +1535,7 @@ function renderOnb(){
     `<img class="logo" src="${LOGO}" alt="" width="150" height="150"><h1 class="hello">Bienvenue à <span class="script">l’AGM</span> !</h1><p>Les cours, l’agenda et toutes les infos du club, au même endroit.</p>`,
     `<div class="onb-art">${ico('saut','huge')}</div><h1 class="hello">Ton <span class="script">enfant</span></h1>
      <div class="field"><label for="onbName">Son prénom</label><input id="onbName" data-onbname value="${esc(onb.name)}" maxlength="20"></div>
-     <div class="opts three">${Object.entries(GROUPS).map(([n,g])=>`<button class="opt grp${onb.group===n?' on':''}" data-onbgroup="${n}"><b>${n}</b>${stars(g.n)}</button>`).join('')}</div>`,
+     ${byCat(n=>`<button class="opt grp${onb.group===n?' on':''}" data-onbgroup="${n}"><b>${n}</b>${grpTag(n)}</button>`,(c,h)=>`<div class="opt-cat">${c}</div><div class="opts three">${h}</div>`)}`,
     `<div class="onb-art">${ico('sol','huge')}</div><h1 class="hello">Avant chaque <span class="script">cours</span></h1><p>Un seul geste pour dire aux coachs si ${esc(onb.name||'ton enfant')} sera là.</p>
      <div class="rsvp demo"><span class="yes on">${I.yes}Oui</span><span class="no">${I.no}Non</span></div>`,
   ];
