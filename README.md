@@ -2,8 +2,8 @@
 
 Prototype cliquable d'une application mobile et desktop pour l'Académie Gymnique Méditerranée.
 
-**L'appli du club (comptes réels) :** https://estellelavenac.github.io/agm-gym/  
-**Démo sans compte :** https://estellelavenac.github.io/agm-gym/?demo
+**L'appli du club (comptes réels) :** https://agm-gym.github.io/  
+**Démo sans compte :** https://agm-gym.github.io/?demo
 
 ## Ce que l'appli propose
 - **Deux espaces**, toujours visibles en haut de l'écran : Parent (violet) et Coach (turquoise, protégé par un code).

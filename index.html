@@ -965,7 +965,7 @@ const store = {
 /* ================= Supabase : version en ligne (comptes + données partagées) ================= */
 const SB_URL='https://jvvvqzithtdqwuuccpqw.supabase.co', SB_KEY='sb_publishable_OFspRBYNKCzGhXn1jv_Qqg_9BDynze_';
 const QS=new URLSearchParams(location.search);
-const LIVE=!QS.has('demo') && (location.hostname==='estellelavenac.github.io' || QS.has('live'));
+const LIVE=!QS.has('demo') && (['agm-gym.github.io','estellelavenac.github.io'].includes(location.hostname) || QS.has('live'));
 const SYNCED=new Set(['kids','rsvp','reasons','regs','csel','appel','appelDone','badges','sent','plans']);
 let sb=null, me=null, allKids=[], last={}, pushT=null, pushing=null, auth={step:'email',email:'',busy:false,err:''};
 const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)});
