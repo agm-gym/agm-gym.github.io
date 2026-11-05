@@ -231,6 +231,9 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .role-btn .av{width:64px;height:64px}.role-btn .av svg{width:100%;height:100%}
 .role-btn b{font-family:var(--f-display);font-size:20px}.role-btn small{color:var(--muted);font-weight:600;font-size:13px;line-height:1.3}
 .role-btn:hover,.role-btn:focus-visible{border-color:var(--violet)}.role-btn.coach:hover,.role-btn.coach:focus-visible{border-color:#0F6E78}
+.coach-list{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column;gap:6px}
+.coach-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-weight:700;font-size:14px;word-break:break-all}
+.coach-list small{color:var(--muted)}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-err{color:#C0392B!important;font-weight:700}
@@ -1134,7 +1137,8 @@ setInterval(msgPoll,5000);
 
 
 /* ---------- première connexion : parent ou coach ---------- */
-let rolePick=null;
+let rolePick=null, coachList=null;
+async function refreshRole(){ try{ const {data}=await sb.from('profiles').select('role').eq('id',me.id).maybeSingle(); if(data) me.role=data.role; }catch(e){} coachOn=me.role==='coach'; if(coachOn){ try{ await pull(); }catch(e){} } return coachOn; }
 function renderRole(){
   const host=document.getElementById('onb'), r=rolePick;
   const body=r.step==='choose'
@@ -1143,36 +1147,39 @@ function renderRole(){
         <button type="button" class="role-btn" data-role="parent"><span class="av face">${parentSvg()}</span><b>Parent</b><small>Mon enfant est inscrit au club</small></button>
         <button type="button" class="role-btn coach" data-role="coach"><span class="av face">${coachSvg(false)}</span><b>Coach</b><small>J’encadre des groupes</small></button>
       </div>`
-    :`<div class="onb-art" style="font-size:64px" aria-hidden="true">🔑</div><h1 class="hello">Code <span class="script">coach</span></h1>
-      <p>Entre le code coach que le club t’a donné.</p>
-      <div class="field"><label for="coachCode">Code coach</label><input id="coachCode" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AGM-XXXXXX" style="text-transform:uppercase;letter-spacing:.12em;text-align:center;font-size:22px" value="${esc(r.code||'')}"></div>
-      ${r.err?`<p class="auth-err" role="alert">${esc(r.err)}</p>`:''}`;
-  host.innerHTML=`<form class="onb" id="roleForm" role="dialog" aria-modal="true" aria-label="Première connexion" novalidate>
-    <div class="onb-top">${r.step==='code'?'<button type="button" class="link" data-roleback>‹ Retour</button>':'<span></span>'}<span></span></div>
-    <div class="onb-body">${body}</div>
-    ${r.step==='code'?`<button class="btn big" type="submit" ${r.busy?'disabled':''}>${r.busy?'Vérification…':'Valider'}</button>`:''}</form>`;
-  const f=host.querySelector('input'); f&&setTimeout(()=>f.focus(),50);
+    :`<div class="onb-art" style="font-size:64px" aria-hidden="true">🔒</div><h1 class="hello">Pas encore <span class="script">coach</span></h1>
+      <p>Ton adresse <b>${esc(me.email)}</b> n’est pas dans la liste des coachs du club.</p>
+      <p>Demande à un coach de t’ajouter (Espace coachs › 👥 Coachs du club), puis touche « Réessayer ».</p>
+      ${r.err?`<p class="auth-err" role="alert">${esc(r.err)}</p>`:''}
+      <button type="button" class="btn big" data-roleretry ${r.busy?'disabled':''}>${r.busy?'Vérification…':'Réessayer'}</button>
+      <button type="button" class="link" data-role="parent">Je suis parent</button>`;
+  host.innerHTML=`<div class="onb" role="dialog" aria-modal="true" aria-label="Première connexion">
+    <div class="onb-top">${r.step==='wait'?'<button type="button" class="link" data-roleback>‹ Retour</button>':'<span></span>'}<span></span></div>
+    <div class="onb-body">${body}</div></div>`;
 }
-async function claimCoach(code){
-  const {data,error}=await sb.rpc('claim_coach',{code});
-  if(error) return /essais/i.test(error.message)?'Trop d’essais : réessaie dans une heure.':'Vérification impossible, vérifie ta connexion.';
-  if(!data) return 'Ce code n’est pas le bon. Demande-le au club.';
-  me.role='coach'; coachOn=true; try{ await pull(); }catch(e){}
-  return null;
-}
-document.addEventListener('click',e=>{
-  const b=e.target.closest('[data-role]'); if(b&&rolePick){ if(b.dataset.role==='parent'){ rolePick=null; onb={step:1,name:'',group:'GAF 1'}; renderOnb(); } else { rolePick={step:'code',code:'',err:''}; renderRole(); } return; }
-  if(e.target.closest('[data-roleback]')){ rolePick={step:'choose'}; renderRole(); }
+async function enterCoach(){ rolePick=null; document.getElementById('onb').innerHTML=''; location.hash='coachs'; render(); toast('👋 Bienvenue coach !'); }
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-role]'); if(b&&rolePick){ if(b.dataset.role==='parent'){ rolePick=null; onb={step:1,name:'',group:'GAF 1'}; renderOnb(); } else { rolePick={step:'wait',busy:true}; renderRole(); if(await refreshRole()) return enterCoach(); rolePick={step:'wait'}; renderRole(); } return; }
+  if(e.target.closest('[data-roleback]')){ rolePick={step:'choose'}; renderRole(); return; }
+  if(e.target.closest('[data-roleretry]')){ rolePick={step:'wait',busy:true}; renderRole(); if(await refreshRole()) return enterCoach(); rolePick={step:'wait',err:'Toujours pas dans la liste. Vérifie avec le coach qu’il a bien saisi cette adresse.'}; renderRole(); return; }
+  if(e.target.closest('[data-lockretry]')){ const bt=e.target.closest('[data-lockretry]'); bt.disabled=true; bt.textContent='Vérification…'; if(await refreshRole()){ render(); toast('👋 Bienvenue coach !'); } else { bt.disabled=false; bt.textContent='Réessayer'; toast('Ton adresse n’est pas encore dans la liste des coachs'); } return; }
+  if(e.target.closest('[data-coachlist]')){ coachSheet(); return; }
+  const rm=e.target.closest('[data-rmcoach]'); if(rm){ const em=rm.dataset.rmcoach; if(rm.dataset.armed!=='1'){ rm.dataset.armed='1'; rm.textContent='Confirmer'; return; }
+    const {error}=await sb.from('coach_emails').delete().eq('email',em); if(error){ toast('⚠️ Impossible de retirer ce coach'); return; } toast(`${em} n’est plus coach`); coachSheet(); }
 });
+async function coachSheet(){
+  openSheet('<h2 class="sheet-title">👥 Coachs du club</h2><p class="hint">Chargement…</p>');
+  const {data,error}=await sb.from('coach_emails').select('*').order('email'); coachList=error?[]:data;
+  openSheet(`<h2 class="sheet-title">👥 Coachs du club</h2>
+    <p class="hint">Une personne dont l’adresse est ici devient coach dès qu’elle se connecte avec le code reçu par e-mail.</p>
+    <ul class="coach-list">${coachList.map(c=>`<li><span>${esc(c.email)}</span>${c.email===me.email.toLowerCase()?'<small>toi</small>':`<button class="link" data-rmcoach="${esc(c.email)}">Retirer</button>`}</li>`).join('')||'<li>Aucun coach</li>'}</ul>
+    <form id="addCoachForm" style="display:flex;flex-direction:column;gap:12px;margin-top:8px"><div class="field"><label for="newCoach">Ajouter un coach (adresse e-mail)</label><input id="newCoach" type="email" inputmode="email" autocomplete="off" placeholder="prenom@exemple.fr" required></div><button class="btn big" type="submit">Ajouter</button></form>`);
+}
 document.addEventListener('submit',async e=>{
-  if(e.target.id!=='roleForm'&&e.target.id!=='coachCodeForm') return; e.preventDefault();
-  const inp=e.target.querySelector('input'); const code=(inp&&inp.value||'').trim(); if(!code) return;
-  if(e.target.id==='roleForm'){ rolePick={step:'code',code,busy:true,err:''}; renderRole();
-    const err=await claimCoach(code); if(err){ rolePick={step:'code',code,err}; renderRole(); return; }
-    rolePick=null; document.getElementById('onb').innerHTML=''; location.hash='coachs'; render(); toast('👋 Bienvenue coach !'); return; }
-  const btn=e.target.querySelector('button'); btn.disabled=true; btn.textContent='Vérification…';
-  const err=await claimCoach(code); if(err){ btn.disabled=false; btn.textContent='Valider'; toast(err); return; }
-  render(); toast('👋 Bienvenue coach !');
+  if(e.target.id!=='addCoachForm') return; e.preventDefault();
+  const v=document.getElementById('newCoach').value.trim().toLowerCase(); if(!/^\S+@\S+\.\S+$/.test(v)){ toast('Adresse e-mail invalide'); return; }
+  const {error}=await sb.from('coach_emails').insert({email:v}); if(error){ toast(/duplicate|exists|unique/i.test(error.message)?'Cette adresse est déjà dans la liste':'⚠️ Ajout impossible'); return; }
+  toast(`✓ ${v} est coach`); coachSheet();
 });
 
 async function liveBoot(){
@@ -1509,7 +1516,7 @@ let coachOn=false, pin='';
 const COACH_PIN='2026'; /* démo uniquement : dans la vraie appli, chaque coach a son compte */
 function vLock(){
   if(LIVE) return `<div class="lock"><img class="logo" src="${LOGO}" alt="" width="96" height="96"><h1 class="hello">Espace <span class="script">coachs</span></h1>
-  <p class="hint" style="text-align:center">🔒 Réservé aux coachs du club. Tu es coach ? Entre le code coach que le club t’a donné.</p><form id="coachCodeForm" class="field" style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px"><input aria-label="Code coach" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AGM-XXXXXX" style="text-transform:uppercase;letter-spacing:.12em;text-align:center;font-size:20px"><button class="btn big" type="submit">Valider</button></form><a class="link" href="#accueil">Retour à l’espace parent</a></div>`;
+  <p class="hint" style="text-align:center">🔒 Réservé aux coachs du club. Ton adresse <b>${esc(me?me.email:'')}</b> n’est pas dans la liste des coachs : demande à un coach de t’ajouter, puis touche « Réessayer ».</p><button class="btn big" data-lockretry>Réessayer</button><a class="link" href="#accueil">Retour à l’espace parent</a></div>`;
   return `<div class="lock"><img class="logo" src="${LOGO}" alt="" width="96" height="96"><h1 class="hello">Espace <span class="script">coachs</span></h1>
   <p class="hint" style="text-align:center">🔒 Réservé aux coachs du club. Entre ton code.</p>
   <div class="pin-dots" aria-live="polite">${[0,1,2,3].map(i=>`<i class="${i<pin.length?'on':''}"></i>`).join('')}</div>
@@ -1521,7 +1528,7 @@ function vCoachs(){
   const g=coachGroup; const s=coachNext(g);
   const tabs=[['appel','✓ Appel'],['prog','🗒️ Prog.'],['compet','🏅 Compét'],['badges','★ Badges']];
   return `
-  <div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span>${LIVE?'<button class="link" data-logout>Se déconnecter</button>':'<button class="link" data-coachout>🔒 Verrouiller</button>'}</div>
+  <div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span>${LIVE?'<span style="display:flex;gap:14px"><button class="link" data-coachlist>👥 Coachs du club</button><button class="link" data-logout>Se déconnecter</button></span>':'<button class="link" data-coachout>🔒 Verrouiller</button>'}</div>
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
