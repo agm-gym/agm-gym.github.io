@@ -242,6 +242,16 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .coach-list{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column;gap:6px}
 .coach-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-weight:700;font-size:14px;word-break:break-all}
 .coach-list small{color:var(--muted)}
+.pres{display:flex;flex-direction:column;gap:12px;margin:10px 0 14px}
+.pres-top{display:flex;flex-direction:column;gap:2px}.pres-top .tn-k{color:var(--violet);opacity:1}
+.pres-dates{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.pres-dates .chip{white-space:nowrap}
+.pres-col h4{margin:0 0 8px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:6px}.pres-col h4 b{margin-left:2px;padding:1px 9px;border-radius:999px;font-size:13px}
+.pres-col.ok h4 b{background:#DDF4EA;color:#147A52}.pres-col.no h4 b{background:#FBE1E6;color:#B8324B}.pres-col.wait h4 b{background:var(--surface-2);color:var(--muted)}
+.pnames{display:flex;flex-wrap:wrap;gap:6px}
+.pname{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--surface-2);font-weight:700;font-size:14px}
+.pname .m-av{width:24px;height:24px;font-size:12px}.pname small{font-weight:700;color:#B8324B;font-size:12px;margin-left:2px}
+.pres-col.ok .pname{background:#E9F8F1}.pres-col.no .pname{background:#FDEEF1}
+.pnone{margin:0;color:var(--muted);font-size:13px}
 .coach-nav{margin:4px 0 14px;grid-template-columns:repeat(3,1fr)}
 .cev-list{display:flex;flex-direction:column;gap:2px;padding:6px 14px;margin-top:14px}
 .cev-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.cev-row:last-child{border-bottom:0}
@@ -1565,7 +1575,22 @@ function coachCompet(g){
     return `<button class="gym${on?' here':''}" data-csel="${esc(gym.name)}" aria-pressed="${on}">${avatar(gym.name)}<span class="gym-name">${esc(gym.name)}</span>${flag}<span class="tick" aria-hidden="true">${on?'✓':''}</span></button>`}).join('')}</div>
   <button class="btn big" data-relance ${wait?'':'disabled'}>🔔 Relancer les ${wait} parent${wait>1?'s':''} en attente</button>`;
 }
-function coachNext(g){return sessions(g,8).find(x=>x.type==='sess'&&!x.ferie)}
+let coachSessI=0;
+function coachSessList(g){return sessions(g,14).filter(x=>x.type==='sess'&&!x.ferie).slice(0,4)}
+function coachNext(g){const l=coachSessList(g); return l[Math.min(coachSessI,l.length-1)]||l[0]}
+function presenceBoard(g,s){
+  const l=coachSessList(g); if(!s) return '';
+  const dates=`<div class="pres-dates" role="group" aria-label="Choisir le cours">${l.map((x,i)=>`<button class="chip" data-csess="${i}" aria-pressed="${x.key===s.key}">${cap1(fr(x.date,{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,''))}</button>`).join('')}</div>`;
+  const list=roster(g); const yes=[],no=[],none=[];
+  list.forEach(gym=>{const a=answerOf(g,s,gym); (a==='yes'?yes:a==='no'?no:none).push(gym)});
+  const nm=(gym,extra='')=>`<span class="pname">${avatar(gym.name)}${esc(gym.name)}${extra}</span>`;
+  const col=(cls,ic,t,arr,f)=>`<div class="pres-col ${cls}"><h4><span aria-hidden="true">${ic}</span>${t} <b class="tnum">${arr.length}</b></h4>${arr.length?`<div class="pnames">${arr.map(f).join('')}</div>`:'<p class="pnone">Personne</p>'}</div>`;
+  return `<section class="card pres" aria-label="Présences au cours">
+    <div class="pres-top"><span class="tn-k">Présences</span><b>${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</b></div>
+    ${dates}
+    ${list.length?col('ok','✅','Là',yes,x=>nm(x))+col('no','❌','Pas là',no,x=>{const r=x.kid?reasons[keyFor(x.kid,s)]:'';return nm(x,r?`<small>${esc(r)}</small>`:'')})+col('wait','❓','Pas encore répondu',none,x=>nm(x)):''}
+  </section>`;
+}
 function answerOf(g,s,gym){
   if(gym.kid) return rsvp[keyFor(gym.kid,s)]||null;
   const r=seeded(g,gym.i+3+gym.name.length); return r<.62?'yes':r<.78?'no':null;
@@ -1631,7 +1656,7 @@ function vCoachs(){
   ${coachBar()}${coachNav('coachs')}
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
-  ${s?`<div class="coach-sess">${dateBlock(s.date)}<div><b>Prochain cours</b><div class="sess-meta tnum">${cap1(fr(s.date,{weekday:'long',day:'numeric',month:'long'}))} · ${hhmm(s.s)} – ${hhmm(s.e)}</div></div></div>`:''}
+  ${presenceBoard(g,s)}
   <div class="seg four" role="tablist">${tabs.map(([id,l])=>`<button role="tab" data-ctab="${id}" aria-selected="${coachTab===id}">${l}</button>`).join('')}</div>
   <section class="card coach-card">${LIVE&&!roster(g).length?'<div class="empty">Aucune gymnaste inscrite dans ce groupe pour l’instant. Elles apparaissent ici dès que leurs parents créent leur compte.</div>':coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
   <p class="proto demo-only">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
@@ -1932,7 +1957,8 @@ document.addEventListener('click',e=>{
   else if(d.delmsg){ if(delPending!==d.delmsg){ delPending=d.delmsg; const y=document.getElementById('msgs')?.scrollTop; render(); const m=document.getElementById('msgs'); if(m&&y!=null) m.scrollTop=y; return; } delPending=null; const id=d.delmsg; sb.from('messages').delete().match({id}).then(async({error})=>{ if(error){toast('⚠️ Suppression impossible');return} liveMsgs[chan]=(liveMsgs[chan]||[]).filter(m=>m.id!==id); try{await pullMsgs()}catch(e){} render(); toast('Message supprimé'); }); }
   else if(d.quick){ sendMsg(d.quick); }
   else if(d.heart){ const r=b.getBoundingClientRect(); hearts[d.heart]=!hearts[d.heart]; store.set('hearts',hearts); const y=document.getElementById('msgs')?.scrollTop; render(); const m=document.getElementById('msgs'); if(m&&y!=null) m.scrollTop=y; if(hearts[d.heart]) burst(r); }
-  else if(d.cgroup){ coachGroup=d.cgroup; store.set('cgroup',coachGroup); draft=null; picker=false; render(); }
+  else if(d.cgroup){ coachGroup=d.cgroup; coachSessI=0; store.set('cgroup',coachGroup); draft=null; picker=false; render(); }
+  else if(d.csess){ coachSessI=+d.csess; draft=null; render(); }
   else if('abs' in d){ absSheet(); }
   else if(d.ics){ downloadIcs(EVENTS.find(e=>e.id===d.ics)); }
   else if(d.cev){ coachEv=d.cev; store.set('cev',coachEv); render(); }
