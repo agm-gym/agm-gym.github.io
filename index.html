@@ -265,6 +265,12 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 #evForm fieldset{border:0;padding:0;margin:0}#evForm legend{font-weight:800;font-size:14px;margin-bottom:8px;padding:0}
 .link.danger{color:#C0392B}.coach-nav a{white-space:nowrap}
 body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-content:flex-end}
+.fam-banner{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 14px;padding:14px 16px;border-radius:16px;border:0;background:linear-gradient(95deg,#FFE9A8,#FFD3E2);color:#5A3B00;font:inherit;font-size:15px;font-weight:700;text-align:left;cursor:pointer}.fam-banner span{margin-left:auto;font-size:20px}
+.fam-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.fam-list li{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:var(--surface-2)}
+.fam-who{display:flex;flex-direction:column;gap:6px}.fam-who small{color:var(--muted);font-weight:600}
+.fam-act{display:flex;align-items:center;gap:14px}
+.pend-kids{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-tip{font-size:13.5px!important;max-width:34ch}
@@ -1011,7 +1017,7 @@ const SB_URL='https://jvvvqzithtdqwuuccpqw.supabase.co', SB_KEY='sb_publishable_
 const QS=new URLSearchParams(location.search);
 const LIVE=!QS.has('demo') && (['agm-gym.github.io','estellelavenac.github.io'].includes(location.hostname) || QS.has('live'));
 const SYNCED=new Set(['kids','rsvp','reasons','regs','csel','appel','appelDone','badges','sent','plans']);
-let sb=null, me=null, allKids=[], last={}, pushT=null, pushing=null, auth={step:'email',email:store.get('lastEmail',''),busy:false,err:''};
+let sb=null, me=null, profilesById={}, allKids=[], last={}, pushT=null, pushing=null, auth={step:'email',email:store.get('lastEmail',''),busy:false,err:''};
 const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)});
 const cut1=s=>{const i=s.indexOf('|');return [s.slice(0,i),s.slice(i+1)]};
 const cutLast=s=>{const i=s.lastIndexOf('|');return [s.slice(0,i),s.slice(i+1)]};
@@ -1053,7 +1059,8 @@ async function pull(){
   if(pushing) await pushing;
   const q=async t=>{const {data,error}=await sb.from(t).select('*'); if(error) throw error; return data||[]};
   const [K,A,E,D,S,R,RD,B,PL]=await Promise.all(['kids','attendance','event_regs','docs_sent','selections','roll_call','roll_call_done','badges','plans'].map(q));
-  allKids=K.map(k=>({id:k.id,name:k.name,group:k.grp,parent:k.parent_id})).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  if(me.role==='coach'){ const {data:P}=await sb.from('profiles').select('id,email,role,approved,rejected,display_name'); profilesById={}; (P||[]).forEach(x=>profilesById[x.id]=x); }
+  allKids=K.map(k=>{const pr=profilesById[k.parent_id]; return {id:k.id,name:k.name,group:k.grp,parent:k.parent_id,ok:k.parent_id===me.id||!pr||pr.role==='coach'||pr.approved}}).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const own=allKids.filter(k=>k.parent===me.id).map(({id,name,group})=>({id,name,group}));
   const blank=kids.find(k=>!k.name&&!kidById(k.id));
   kids=own.length?own:[blank||{id:uuid(),name:'',group:'GAF 1'}];
@@ -1114,7 +1121,7 @@ document.addEventListener('click',e=>{ if(e.target.closest('[data-authback]')){ 
 async function afterLogin(user){
   if(me&&me.id===user.id) return;
   me={id:user.id,email:user.email,role:'parent'};
-  try{ const {data}=await sb.from('profiles').select('role,display_name').eq('id',user.id).maybeSingle(); if(data){ me.role=data.role; me.name=data.display_name||''; } }catch(e){}
+  try{ const {data}=await sb.from('profiles').select('role,display_name,approved,rejected').eq('id',user.id).maybeSingle(); if(data){ me.role=data.role; me.name=data.display_name||''; me.approved=!!data.approved; me.rejected=!!data.rejected; } }catch(e){}
   coachOn=me.role==='coach';
   try{ await pull(); }catch(err){ console.warn(err); toast('⚠️ Connexion au club impossible pour le moment'); }
   document.getElementById('onb').innerHTML='';
@@ -1285,6 +1292,48 @@ document.addEventListener('submit',async e=>{
   if(LIVE){ const q=evEdit?sb.from('events').update(row).eq('id',evEdit):sb.from('events').insert(row); const {error}=await q; if(error){ btn.disabled=false; toast('⚠️ Enregistrement impossible'); return; } await pullEvents(); }
   else { const r={...row,id:evEdit||('l'+Date.now())}; const ev=evFromRow(r,{}); if(evEdit){ const old=EVENTS.find(x=>x.id===evEdit); ev.taken=old?old.taken:0; EVENTS=EVENTS.map(x=>x.id===evEdit?ev:x);} else EVENTS=[...EVENTS,ev].sort((a,b)=>a.date.localeCompare(b.date)); }
   closeSheet(); render(); toast(evEdit?'✓ Événement modifié':'📅 Ajouté à l’agenda des parents');
+});
+
+
+/* ---------- validation des familles ---------- */
+const isPending=()=>LIVE&&me&&me.role!=='coach'&&!me.approved;
+function renderPending(){
+  const host=document.getElementById('onb'); const ks=kids.filter(k=>k.name);
+  host.innerHTML=`<div class="onb" role="dialog" aria-modal="true" aria-label="Compte en attente">
+    <div class="onb-top"><span></span><button class="link" data-logout>Se déconnecter</button></div>
+    <div class="onb-body">${me.rejected
+      ?`<div class="onb-art" style="font-size:64px" aria-hidden="true">🙁</div><h1 class="hello">Demande <span class="script">refusée</span></h1><p>Ton compte n’a pas été validé par le club. Si c’est une erreur, rapproche-toi d’un coach.</p>`
+      :`<img class="logo" src="${LOGO}" alt="" width="110" height="110"><h1 class="hello">Demande <span class="script">envoyée</span> ⏳</h1>
+        <p>Un coach du club va vérifier et valider ton compte. Ensuite tu pourras répondre aux cours, voir l’agenda et écrire dans la messagerie.</p>
+        ${ks.length?`<div class="pend-kids">${ks.map(k=>`<span class="pname">${avatar(k.name)}${esc(k.name)} <small>${esc(k.group)}</small></span>`).join('')}</div>`:''}
+        <button class="btn big" data-pendcheck>Vérifier maintenant</button>
+        <p class="hint" style="font-size:13px">L’appli vérifie aussi toute seule toutes les 30 secondes.</p>`}</div></div>`;
+}
+async function checkApproval(manual){
+  try{ const {data}=await sb.from('profiles').select('approved,rejected,role').eq('id',me.id).maybeSingle(); if(data){ me.approved=!!data.approved; me.rejected=!!data.rejected; me.role=data.role; } }catch(e){}
+  if(!isPending()){ try{ await pull(); }catch(e){} document.getElementById('onb').innerHTML=''; render(); toast('🎉 Ton compte est validé, bienvenue !'); return; }
+  renderPending(); if(manual) toast('Toujours en attente de validation');
+}
+setInterval(()=>{ if(isPending()&&!onb&&!rolePick&&document.visibilityState==='visible') checkApproval(false); },30000);
+function pendingFamilies(){ return Object.values(profilesById).filter(p=>p.role==='parent'&&!p.approved&&!p.rejected); }
+function famSheet(){
+  const fams=pendingFamilies();
+  openSheet(`<h2 class="sheet-title">👋 Familles à valider</h2>
+    <p class="hint">Vérifie que ces enfants sont bien inscrits au club avant de valider : une fois validée, la famille voit l’agenda et la messagerie de son groupe.</p>
+    ${fams.length?`<ul class="fam-list">${fams.map(p=>{const ks=allKids.filter(k=>k.parent===p.id);
+      return `<li><div class="fam-who"><b>${esc(p.display_name||p.email)}</b>${p.display_name?`<small>${esc(p.email)}</small>`:''}
+        <div class="pnames">${ks.length?ks.map(k=>`<span class="pname">${avatar(k.name)}${esc(k.name)} <small>${esc(k.group)}</small></span>`).join(''):'<small class="pnone">Pas encore d’enfant déclaré</small>'}</div></div>
+        <div class="fam-act"><button class="btn sm" data-famok="${p.id}">Valider</button><button class="link danger" data-famno="${p.id}">Refuser</button></div></li>`}).join('')}</ul>`
+    :'<div class="empty">Aucune famille en attente 👍</div>'}`);
+}
+document.addEventListener('click',async e=>{
+  if(e.target.closest('[data-pendcheck]')){ checkApproval(true); return; }
+  if(e.target.closest('[data-fam]')){ famSheet(); return; }
+  const ok=e.target.closest('[data-famok]'), no=e.target.closest('[data-famno]'); if(!ok&&!no) return;
+  if(no&&no.dataset.armed!=='1'){ no.dataset.armed='1'; no.textContent='Confirmer le refus'; return; }
+  const id=(ok||no).dataset[ok?'famok':'famno']; (ok||no).disabled=true;
+  const {error}=await sb.rpc('review_family',{parent:id,ok:!!ok}); if(error){ toast('⚠️ Action impossible'); (ok||no).disabled=false; return; }
+  try{ await pull(); }catch(err){} famSheet(); render(); toast(ok?'✓ Famille validée':'Demande refusée');
 });
 
 async function liveBoot(){
@@ -1553,7 +1602,7 @@ let appel=store.get('appel',{}), appelDone=store.get('appelDone',{}), customPlan
 let badges=store.get('badges',{'GAF 1|Lia':['rav','chd','sext']}), badgeGym=null, draft=null, picker=false;
 function roster(g){
   const baby=catOf(g)==='Babies', pool=baby?BNAMES:NAMES, off=Object.keys(GROUPS).filter(x=>catOf(x)===catOf(g)).indexOf(g)*(baby?6:14); const n=GROUPS[g].effectif;
-  const real=(LIVE?allKids:kids).filter(k=>k.group===g&&k.name).map(k=>({name:k.name,kid:k})); if(LIVE) return real.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  const real=(LIVE?allKids.filter(k=>k.ok):kids).filter(k=>k.group===g&&k.name).map(k=>({name:k.name,kid:k})); if(LIVE) return real.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
   const others=[...pool.slice(off),...pool.slice(0,off)].slice(0,n).filter(x=>!real.some(r=>r.name===x)).slice(0,n-real.length).map((name,i)=>({name,i}));
   return [...real,...others].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
 }
@@ -1656,7 +1705,7 @@ function vCoachs(){
   const g=coachGroup; const s=coachNext(g);
   const tabs=[['appel','✓ Appel'],['prog','🗒️ Prog.'],['compet','🏅 Compét'],['badges','★ Badges']];
   return `
-  ${coachBar()}${coachNav('coachs')}
+  ${coachBar()}${coachNav('coachs')}${LIVE&&pendingFamilies().length?`<button class="fam-banner" data-fam>👋 <b>${pendingFamilies().length} famille${pendingFamilies().length>1?'s':''}</b> en attente de validation <span aria-hidden="true">›</span></button>`:''}
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${presenceBoard(g,s)}
@@ -1919,6 +1968,7 @@ function renderOnb(){
   const host=document.getElementById('onb');
   if(LIVE&&!me){ renderAuth(); return; }
   if(LIVE&&rolePick){ renderRole(); return; }
+  if(!onb&&isPending()){ renderPending(); return; }
   if(!onb){ host.innerHTML=''; return; }
   const st=onb.step; const l=look(kid());
   const dots=`<div class="onb-dots">${[0,1,2].map(i=>`<i class="${i===st?'on':''}"></i>`).join('')}</div>`;
