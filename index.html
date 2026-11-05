@@ -1564,7 +1564,8 @@ function selStatus(evId,g,gym){
   const n=(gym.i*7+evId.charCodeAt(1))%6; return n<3?'yes':n===3?'no':null;
 }
 function coachCompet(g){
-  const ev=EVENTS.find(e=>e.id===coachEv)||COMPETS()[0]; const list=roster(g);
+  const ev=EVENTS.find(e=>e.id===coachEv&&e.kind==='compet')||COMPETS()[0]; const list=roster(g);
+  if(!ev) return `<div class="empty">Aucune compétition dans l’agenda pour l’instant.<br>Ajoute-la dans <a href="#cagenda">📅 Agenda</a> (type « Compétition ») pour faire ta sélection ici.</div>`;
   const sel=list.filter(x=>isSel(ev.id,g,x.name)); const conf=sel.filter(x=>selStatus(ev.id,g,x)==='yes').length; const wait=sel.filter(x=>!selStatus(ev.id,g,x)).length;
   return `<div class="filters" role="group" aria-label="Compétition">${COMPETS().map(e=>`<button class="chip" data-cev="${e.id}" aria-pressed="${e.id===ev.id}">🏅 ${fr(parse(e.date),{day:'numeric',month:'short'})}</button>`).join('')}</div>
   <b style="display:block;margin:8px 0 2px">${ev.title}</b>
@@ -1906,7 +1907,8 @@ function render(){
   document.getElementById('sideNav').innerHTML=nav; document.getElementById('tabNav').innerHTML=nav;
   const views={accueil:vAccueil,planning:vPlanning,agenda:vAgenda,messages:vMessages,coachs:vCoachs,cmessages:vCoachMsgs,cagenda:vCoachAgenda,
     photos:()=>vHub('photos'),docs:()=>vHub('docs'),club:()=>vHub('infos')};
-  document.getElementById('view').innerHTML=modeBar(mode)+views[r]();
+  let html; try{ html=views[r](); }catch(err){ console.error(err); html=`<div class="empty" style="margin-top:20px">Oups, cette page n’a pas pu s’afficher. <a href="#accueil">Retour à l’accueil</a></div>`; }
+  document.getElementById('view').innerHTML=modeBar(mode)+html;
   renderOnb();
 }
 
