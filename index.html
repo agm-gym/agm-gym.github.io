@@ -234,7 +234,18 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 .coach-list{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column;gap:6px}
 .coach-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-weight:700;font-size:14px;word-break:break-all}
 .coach-list small{color:var(--muted)}
-.coach-nav{margin:4px 0 14px;grid-template-columns:1fr 1fr}.coach-nav a{white-space:nowrap}
+.coach-nav{margin:4px 0 14px;grid-template-columns:repeat(3,1fr)}
+.cev-list{display:flex;flex-direction:column;gap:2px;padding:6px 14px;margin-top:14px}
+.cev-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.cev-row:last-child{border-bottom:0}
+.cev-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.cev-main b{font-size:15px}
+.cev-past{margin-top:16px}.cev-past summary{cursor:pointer;font-weight:800;color:var(--muted)}
+.ev-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ev-groups{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip-check{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1.5px solid var(--line);font-weight:700;font-size:14px;white-space:nowrap}
+#evForm .ackline{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;text-align:left;width:auto;justify-content:flex-start}#evForm .ackline input{width:20px;height:20px;flex:none;margin:0}
+#evForm textarea{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface-2);color:var(--ink);resize:vertical}
+#evForm fieldset{border:0;padding:0;margin:0}#evForm legend{font-weight:800;font-size:14px;margin-bottom:8px;padding:0}
+.link.danger{color:#C0392B}.coach-nav a{white-space:nowrap}
 body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-content:flex-end}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
@@ -884,7 +895,7 @@ const HOLIDAYS = [
 const FERIES = {'2026-11-11':'Armistice','2026-12-25':'Noël','2027-01-01':'Jour de l’an','2027-04-05':'Lundi de Pâques','2027-05-01':'Fête du travail','2027-05-08':'Victoire 1945','2027-05-17':'Lundi de Pentecôte'};
 
 /* Événements : exemples à remplacer par le vrai calendrier du club */
-const EVENTS = [
+let EVENTS = [
   {id:'e1',kind:'fort',date:'2026-11-21',time:'10:00 – 12:00',title:'Matinée « Viens gym avec moi »',text:'Les parents passent de l’autre côté de la barrière et font la séance avec leur gymnaste.',groups:'all',cap:40,taken:23,guests:true,price:'Gratuit'},
   {id:'e2',kind:'fort',date:'2026-12-05',time:'14:00 – 17:00',title:'Défi Téléthon',text:'Parcours gym ouvert à toute la famille, au profit du Téléthon.',groups:'all',cap:80,taken:31,guests:true,price:'Don libre'},
   {id:'e3',kind:'fort',date:'2026-12-16',time:'10:00 – 12:00',title:'Fête de Noël du club',text:'Démonstration des groupes GAF et Babies puis goûter. Chaque famille apporte un gâteau ou une boisson.',groups:'all',cap:120,taken:64,guests:true,price:'Gratuit'},
@@ -1037,6 +1048,7 @@ async function pull(){
   badges={}; B.forEach(r=>{const kd=kidById(r.kid_id); if(kd){const k=`${kd.group}|${kd.name}`;(badges[k]=badges[k]||[]).push(r.skill_id)}});
   customPlans={}; PL.forEach(r=>{customPlans[`${r.grp}|${r.session_key}`]=r.content});
   last={}; Object.keys(TABLES).forEach(t=>last[t]=snap(t));
+  try{ await pullEvents(); }catch(e){ console.warn('events',e); }
   try{ await pullMsgs(); }catch(e){ console.warn('msgs',e); }
 }
 const busyUI=()=>document.getElementById('layer').innerHTML||(onb&&!LIVE)||document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
@@ -1188,6 +1200,73 @@ document.addEventListener('submit',async e=>{
   toast(`✓ ${v} est coach`); coachSheet();
 });
 
+
+/* ---------- agenda partagé ---------- */
+const evFromRow=(r,cnt)=>({id:r.id,kind:r.kind,title:esc(r.title),text:esc(r.body||''),date:r.date,end:r.end_date||undefined,time:esc(r.time_label||''),
+  groups:(!r.groups||r.groups.includes('all'))?'all':r.groups,cap:r.cap||0,taken:cnt[r.id]||0,price:esc(r.price||''),guests:!!r.guests,raw:r});
+async function pullEvents(){
+  const [{data,error},c]=await Promise.all([sb.from('events').select('*').order('date'),sb.rpc('event_counts')]);
+  if(error) throw error; const cnt={}; ((c&&c.data)||[]).forEach(x=>cnt[x.event_id]=+x.taken);
+  EVENTS=(data||[]).map(r=>evFromRow(r,cnt));
+}
+let evEdit=null;
+function vCoachAgenda(){
+  if(!coachOn) return vLock();
+  const up=EVENTS.filter(e=>parse(e.end||e.date)>=today), past=EVENTS.filter(e=>parse(e.end||e.date)<today);
+  const row=e=>`<div class="cev-row"><span class="ev-ic" aria-hidden="true">${KIND_IC[e.kind]}</span><div class="cev-main"><span class="kind ${e.kind}">${KIND[e.kind]}</span><b>${e.title}</b><span class="sess-meta tnum">${cap1(fr(parse(e.date),{weekday:'short',day:'numeric',month:'short'}))}${e.end?` → ${fr(parse(e.end),{day:'numeric',month:'short'})}`:''}${e.time?' · '+e.time:''} · ${e.groups==='all'?'Tous les groupes':e.groups.join(', ')}${e.kind!=='compet'?` · ${e.taken} inscrit${e.taken>1?'s':''}${e.cap?' / '+e.cap:''}`:''}</span></div><button class="link" data-evedit="${e.id}">Modifier</button></div>`;
+  return `${coachBar()}${coachNav('cagenda')}
+  <h1 class="hello">Agenda <span class="script">partagé</span></h1>
+  <p class="hint">Ce que tu ajoutes ici apparaît tout de suite dans l’onglet Agenda des parents concernés.</p>
+  <button class="btn big" data-evnew>＋ Ajouter un événement</button>
+  <section class="card cev-list">${up.length?up.map(row).join(''):'<div class="empty">Aucun événement à venir.</div>'}</section>
+  ${past.length?`<details class="cev-past"><summary>Événements passés (${past.length})</summary><section class="card cev-list">${past.map(row).join('')}</section></details>`:''}`;
+}
+function evForm(e){
+  const r=e?e.raw||{kind:e.kind,title:e.title,body:e.text,date:e.date,end_date:e.end,time_label:e.time,groups:e.groups==='all'?['all']:e.groups,cap:e.cap||null,price:e.price,guests:e.guests}:{kind:'fort',groups:['all'],guests:false};
+  const all=!r.groups||r.groups.includes('all');
+  openSheet(`<h2 class="sheet-title">${e?'Modifier l’événement':'Nouvel événement'}</h2>
+  <form id="evForm" style="display:flex;flex-direction:column;gap:14px">
+    <fieldset class="field"><legend>Type</legend><div class="opts three">${Object.entries(KIND).map(([k,l])=>`<label class="opt"><input type="radio" name="kind" value="${k}" ${r.kind===k?'checked':''}><div><b>${KIND_IC[k]} ${l}</b></div></label>`).join('')}</div></fieldset>
+    <div class="field"><label for="evTitle">Titre</label><input id="evTitle" required maxlength="120" value="${esc(r.title||'')}" placeholder="Ex. : Fête de Noël du club"></div>
+    <div class="ev-2"><div class="field"><label for="evDate">Date</label><input id="evDate" type="date" required value="${r.date||''}"></div>
+    <div class="field"><label for="evEnd">Fin (si plusieurs jours)</label><input id="evEnd" type="date" value="${r.end_date||''}"></div></div>
+    <div class="field"><label for="evTime">Horaires</label><input id="evTime" maxlength="40" value="${esc(r.time_label||'')}" placeholder="Ex. : 10:00 – 12:00, ou Journée"></div>
+    <div class="field"><label for="evBody">Description</label><textarea id="evBody" maxlength="1500" rows="3" placeholder="Ce que les parents doivent savoir">${esc(r.body||'')}</textarea></div>
+    <fieldset class="field"><legend>Pour quels groupes ?</legend>
+      <label class="ackline"><input type="checkbox" id="evAll" ${all?'checked':''}> Tous les groupes</label>
+      <div class="ev-groups" ${all?'hidden':''}>${Object.keys(GROUPS).map(g=>`<label class="chip-check"><input type="checkbox" name="evg" value="${g}" ${!all&&r.groups.includes(g)?'checked':''}>${g}</label>`).join('')}</div></fieldset>
+    <div class="ev-2"><div class="field"><label for="evCap">Places max (vide = sans limite)</label><input id="evCap" type="number" min="1" inputmode="numeric" value="${r.cap||''}"></div>
+    <div class="field"><label for="evPrice">Tarif</label><input id="evPrice" maxlength="60" value="${esc(r.price||'')}" placeholder="Ex. : Gratuit, 5 €"></div></div>
+    <label class="ackline"><input type="checkbox" id="evGuests" ${r.guests?'checked':''}> Les familles peuvent venir à plusieurs</label>
+    <button class="btn big" type="submit">${e?'Enregistrer':'Publier dans l’agenda'}</button>
+    ${e?`<button type="button" class="link danger" data-evdel="${e.id}">Supprimer cet événement</button>`:''}
+  </form>`);
+}
+document.addEventListener('change',e=>{ if(e.target.id==='evAll'){ const g=document.querySelector('.ev-groups'); if(g) g.hidden=e.target.checked; } });
+document.addEventListener('click',async e=>{
+  if(e.target.closest('[data-evnew]')){ evEdit=null; evForm(null); return; }
+  const ed=e.target.closest('[data-evedit]'); if(ed){ evEdit=ed.dataset.evedit; evForm(EVENTS.find(x=>x.id===evEdit)); return; }
+  const del=e.target.closest('[data-evdel]'); if(del){ if(del.dataset.armed!=='1'){ del.dataset.armed='1'; del.textContent='Confirmer la suppression ?'; return; }
+    const id=del.dataset.evdel;
+    if(LIVE){ const {error}=await sb.from('events').delete().eq('id',id); if(error){ toast('⚠️ Suppression impossible'); return; } await pullEvents(); }
+    else EVENTS=EVENTS.filter(x=>x.id!==id);
+    closeSheet(); render(); toast('Événement supprimé'); }
+});
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='evForm') return; e.preventDefault();
+  const f=e.target, v=id=>document.getElementById(id).value.trim();
+  const all=document.getElementById('evAll').checked, gs=[...f.querySelectorAll('[name=evg]:checked')].map(x=>x.value);
+  if(!all&&!gs.length){ toast('Choisis au moins un groupe'); return; }
+  const row={kind:f.querySelector('[name=kind]:checked').value,title:v('evTitle'),body:v('evBody'),date:v('evDate'),end_date:v('evEnd')||null,time_label:v('evTime'),
+    groups:all?['all']:gs,cap:+v('evCap')||null,price:v('evPrice'),guests:document.getElementById('evGuests').checked};
+  if(!row.title||!row.date){ toast('Indique au moins un titre et une date'); return; }
+  if(row.end_date&&row.end_date<row.date){ toast('La date de fin est avant la date de début'); return; }
+  const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
+  if(LIVE){ const q=evEdit?sb.from('events').update(row).eq('id',evEdit):sb.from('events').insert(row); const {error}=await q; if(error){ btn.disabled=false; toast('⚠️ Enregistrement impossible'); return; } await pullEvents(); }
+  else { const r={...row,id:evEdit||('l'+Date.now())}; const ev=evFromRow(r,{}); if(evEdit){ const old=EVENTS.find(x=>x.id===evEdit); ev.taken=old?old.taken:0; EVENTS=EVENTS.map(x=>x.id===evEdit?ev:x);} else EVENTS=[...EVENTS,ev].sort((a,b)=>a.date.localeCompare(b.date)); }
+  closeSheet(); render(); toast(evEdit?'✓ Événement modifié':'📅 Ajouté à l’agenda des parents');
+});
+
 async function liveBoot(){
   document.body.classList.add('live'); onb=null;
   try{ await loadSb(); }catch(e){ document.getElementById('view').innerHTML='<div class="empty" style="margin-top:30vh">Impossible de charger l’appli : vérifie ta connexion puis recharge la page.</div>'; return; }
@@ -1294,7 +1373,7 @@ const KIND_IC = {stage:'🤸',compet:'🏅',fort:'🎉'};
 function eventCard(ev,k){
   const d=parse(ev.date), past=(ev.end?parse(ev.end):d)<today;
   const mine=regs[`${k.id}|${ev.id}`]; const ok=forGroup(ev,k.group);
-  const left=ev.cap-ev.taken-(mine?1:0);
+  const left=ev.cap?ev.cap-ev.taken-(mine?1:0):Infinity;
   const range = ev.end ? `${fr(d,{day:'numeric'})} → ${fr(parse(ev.end),{day:'numeric',month:'short'})}` : fr(d,{weekday:'short',day:'numeric',month:'short'});
   let action;
   const compet=ev.kind==='compet';
@@ -1308,7 +1387,7 @@ function eventCard(ev,k){
   return `<button class="ev ev-${ev.kind}${past?' past':''}" data-ev="${ev.id}">
     <span class="ev-ic" aria-hidden="true">${KIND_IC[ev.kind]}</span>
     <span class="ev-main"><span class="kind ${ev.kind}">${KIND[ev.kind]}</span><b>${ev.title}</b><span class="sess-meta tnum">${range} · ${ev.time}</span>
-    <span class="ev-foot">${compet?`<span class="cap">${isSel(ev.id,k.group,k.name)?'🏅 Sélectionnée':'Sélection des coachs'}</span>`:`<span class="cap tnum"><span class="bar"><i style="width:${Math.min(100,(ev.cap-left)/ev.cap*100)}%"></i></span>${Math.max(left,0)} places</span>`}${action}</span></span>
+    <span class="ev-foot">${compet?`<span class="cap">${isSel(ev.id,k.group,k.name)?'🏅 Sélectionnée':'Sélection des coachs'}</span>`:(ev.cap?`<span class="cap tnum"><span class="bar"><i style="width:${Math.min(100,(ev.cap-left)/ev.cap*100)}%"></i></span>${Math.max(left,0)} places</span>`:`<span class="cap">${ev.taken?`${ev.taken} inscrits`:'Places libres'}</span>`)}${action}</span></span>
   </button>`;
 }
 
@@ -1407,8 +1486,8 @@ function vAgenda(){
   return `
   <h1 class="hello">Agenda <span class="script">de la saison</span></h1>
   <div class="filters" role="group" aria-label="Filtrer">${f.map(([v,l])=>`<button class="chip" data-filter="${v}" aria-pressed="${evFilter===v}">${l}</button>`).join('')}</div>
-  ${Object.keys(months).length?Object.entries(months).map(([m,evs])=>`<section class="col"><div class="week-h">${m}</div><div class="events">${evs.map(e=>eventCard(e,k)).join('')}</div></section>`).join(''):'<div class="empty">Rien pour l’instant.</div>'}
-  <p class="proto">Événements donnés en exemple</p>`;
+  ${Object.keys(months).length?Object.entries(months).map(([m,evs])=>`<section class="col"><div class="week-h">${m}</div><div class="events">${evs.map(e=>eventCard(e,k)).join('')}</div></section>`).join(''):`<div class="empty">${LIVE&&!EVENTS.length?'Aucun événement pour l’instant : les coachs les ajouteront ici.':'Rien pour l’instant.'}</div>`}
+  ${LIVE?'':'<p class="proto">Événements donnés en exemple</p>'}`;
 }
 
 function vClub(){
@@ -1725,7 +1804,7 @@ function kidSheet(){
 }
 function evSheet(id){
   const ev=EVENTS.find(e=>e.id===id); const k=kid(); const key=`${k.id}|${ev.id}`; const mine=regs[key];
-  const d=parse(ev.date), past=(ev.end?parse(ev.end):d)<today, left=ev.cap-ev.taken-(mine?1:0), ok=forGroup(ev,k.group);
+  const d=parse(ev.date), past=(ev.end?parse(ev.end):d)<today, left=ev.cap?ev.cap-ev.taken-(mine?1:0):Infinity, ok=forGroup(ev,k.group);
   const range = ev.end ? `Du ${fr(d,{day:'numeric'})} au ${fr(parse(ev.end),{day:'numeric',month:'long'})}` : cap1(fr(d,{weekday:'long',day:'numeric',month:'long'}));
   let action;
   const warn=`<div class="feewarn" role="note"><span aria-hidden="true">⚠️</span><p><b>Important :</b> si l’enfant est inscrit et ne vient pas, <b>cette somme (${esc(ev.price.replace(/^Engagement\s*/,''))}) sera à la charge des parents</b>, sauf maladie avec certificat médical.</p></div>`;
@@ -1749,7 +1828,7 @@ function evSheet(id){
 /* ================= rendu & événements ================= */
 function route(){return (location.hash||'#accueil').slice(1)}
 const inMsgs=()=>['messages','cmessages'].includes(route());
-const coachNav=cur=>{const un=totalUnread(); return `<div class="seg coach-nav" role="tablist"><a role="tab" href="#coachs" aria-selected="${cur==='coachs'}">📋 Mes groupes</a><a role="tab" href="#cmessages" aria-selected="${cur==='cmessages'}">💬 Messages${un?` <i class="dotbadge">${un}</i>`:''}</a></div>`};
+const coachNav=cur=>{const un=totalUnread(); return `<div class="seg coach-nav" role="tablist"><a role="tab" href="#coachs" aria-selected="${cur==='coachs'}">📋 Groupes</a><a role="tab" href="#cagenda" aria-selected="${cur==='cagenda'}">📅 Agenda</a><a role="tab" href="#cmessages" aria-selected="${cur==='cmessages'}">💬 Messages${un?` <i class="dotbadge">${un}</i>`:''}</a></div>`};
 const dureeCours=x=>{const m=t=>{const [h,mi]=t.split(':').map(Number);return h*60+mi}; const d=m(x.e)-m(x.s); const h=Math.floor(d/60), mn=d%60; return h?`${h} h${mn?' '+String(mn).padStart(2,'0'):''}`:`${mn} min`};
 function coachBar(){ return `<div class="coach-bar"><span class="sess-meta">Connecté·e en coach</span>${LIVE?'<span style="display:flex;gap:14px"><button class="link" data-coachlist>👥 Coachs du club</button><button class="link" data-logout>Se déconnecter</button></span>':'<button class="link" data-coachout>🔒 Verrouiller</button>'}</div>`; }
 function vCoachMsgs(){ if(!coachOn) return vLock(); return coachBar()+coachNav('cmessages')+vMessages(); }
@@ -1776,16 +1855,16 @@ function vHub(seg){
 }
 function render(){
   applyTheme(); applyLook();
-  const raw=route(); const known=[...TABS.map(t=>t[0]),'photos','docs','coachs','cmessages'];
+  const raw=route(); const known=[...TABS.map(t=>t[0]),'photos','docs','coachs','cmessages','cagenda'];
   const r=known.includes(raw)?raw:'accueil';
-  const mode=kidMode?'kid':(r==='coachs'||r==='cmessages')?'coach':'parent';
+  const mode=kidMode?'kid':(r==='coachs'||r==='cmessages'||r==='cagenda')?'coach':'parent';
   document.body.classList.toggle('kidmode',mode==='kid');
   document.body.classList.toggle('coachmode',mode==='coach');
   const navId=['photos','docs','club'].includes(r)?'club':r;
   const unread=totalUnread();
   const nav=TABS.map(([id,l,ic])=>`<a class="tab" href="#${id}" ${id===navId?'aria-current="page"':''}><span class="tab-ic">${ic}${id==='messages'&&unread?`<i class="badge">${unread}</i>`:''}</span><span>${l}</span></a>`).join('');
   document.getElementById('sideNav').innerHTML=nav; document.getElementById('tabNav').innerHTML=nav;
-  const views={accueil:vAccueil,planning:vPlanning,agenda:vAgenda,messages:vMessages,coachs:vCoachs,cmessages:vCoachMsgs,
+  const views={accueil:vAccueil,planning:vPlanning,agenda:vAgenda,messages:vMessages,coachs:vCoachs,cmessages:vCoachMsgs,cagenda:vCoachAgenda,
     photos:()=>vHub('photos'),docs:()=>vHub('docs'),club:()=>vHub('infos')};
   document.getElementById('view').innerHTML=modeBar(mode)+views[r]();
   renderOnb();
