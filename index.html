@@ -1056,7 +1056,7 @@ document.addEventListener('submit',async e=>{
     if(!/^\S+@\S+\.\S+$/.test(v)){ auth.err='Cette adresse e-mail ne semble pas valide.'; return renderAuth(); }
     auth.email=v; auth.busy=true; renderAuth();
     const {error}=await sb.auth.signInWithOtp({email:v,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname}});
-    auth.busy=false; if(error){ auth.err=/rate|limit|seconds/i.test(error.message)?'Trop de demandes : attends une minute avant de redemander un code.':'Impossible d’envoyer le code. Vérifie ton adresse et réessaie.'; }
+    auth.busy=false; if(error){ auth.err=/seconds/i.test(error.message)?'Un e-mail vient de partir : attends une minute avant d’en redemander un.':/rate|limit/i.test(error.message)?'Trop d’e-mails envoyés pour le moment. Si tu as déjà reçu un e-mail de connexion, utilise son lien. Sinon, réessaie un peu plus tard.':'Impossible d’envoyer le code. Vérifie ton adresse et réessaie.'; }
     else auth.step='code';
     renderAuth();
   } else {
