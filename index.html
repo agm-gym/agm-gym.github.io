@@ -267,6 +267,7 @@ h1,h2,h3{font-family:var(--f-display);line-height:1.1;text-wrap:balance;margin:0
 body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-content:flex-end}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
+.auth-tip{font-size:13.5px!important;max-width:34ch}
 .auth-err{color:#C0392B!important;font-weight:700}
 .acct{text-align:center;color:var(--muted);font-size:13.5px;margin:22px 0 4px}.acct a{color:var(--violet);font-weight:700}
 body.live .proto.demo-only{display:none}
@@ -1010,7 +1011,7 @@ const SB_URL='https://jvvvqzithtdqwuuccpqw.supabase.co', SB_KEY='sb_publishable_
 const QS=new URLSearchParams(location.search);
 const LIVE=!QS.has('demo') && (['agm-gym.github.io','estellelavenac.github.io'].includes(location.hostname) || QS.has('live'));
 const SYNCED=new Set(['kids','rsvp','reasons','regs','csel','appel','appelDone','badges','sent','plans']);
-let sb=null, me=null, allKids=[], last={}, pushT=null, pushing=null, auth={step:'email',email:'',busy:false,err:''};
+let sb=null, me=null, allKids=[], last={}, pushT=null, pushing=null, auth={step:'email',email:store.get('lastEmail',''),busy:false,err:''};
 const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)});
 const cut1=s=>{const i=s.indexOf('|');return [s.slice(0,i),s.slice(i+1)]};
 const cutLast=s=>{const i=s.lastIndexOf('|');return [s.slice(0,i),s.slice(i+1)]};
@@ -1077,7 +1078,8 @@ function renderAuth(){
   const body=a.step==='email'
     ?`<img class="logo" src="${LOGO}" alt="" width="130" height="130"><h1 class="hello">Bienvenue à <span class="script">l’AGM</span> !</h1>
       <p>Entre ton e-mail : on t’envoie un code pour te connecter. Pas de mot de passe à retenir.</p>
-      <div class="field"><label for="authEmail">Ton e-mail</label><input id="authEmail" type="email" inputmode="email" autocomplete="email" required value="${esc(a.email)}" placeholder="prenom@exemple.fr"></div>`
+      <div class="field"><label for="authEmail">Ton e-mail</label><input id="authEmail" type="email" inputmode="email" autocomplete="email" required value="${esc(a.email)}" placeholder="prenom@exemple.fr"></div>
+      <p class="auth-tip">💡 Pour rester connecté·e, ouvre toujours l’appli depuis le même navigateur, ou mieux : ajoute-la à ton écran d’accueil.</p>`
     :`<div class="onb-art" style="font-size:72px" aria-hidden="true">📬</div><h1 class="hello">Ton <span class="script">code</span></h1>
       <p>On vient d’envoyer un code à <b>${esc(a.email)}</b>. Regarde aussi dans les spams.</p>
       <div class="field"><label for="authCode">Code reçu par e-mail</label><input id="authCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required style="letter-spacing:.3em;text-align:center;font-size:26px"></div>
@@ -1093,7 +1095,7 @@ document.addEventListener('submit',async e=>{
   if(auth.step==='email'){
     const v=document.getElementById('authEmail').value.trim().toLowerCase();
     if(!/^\S+@\S+\.\S+$/.test(v)){ auth.err='Cette adresse e-mail ne semble pas valide.'; return renderAuth(); }
-    auth.email=v; auth.busy=true; renderAuth();
+    auth.email=v; store.set('lastEmail',v); auth.busy=true; renderAuth();
     const {error}=await sb.auth.signInWithOtp({email:v,options:{shouldCreateUser:true,emailRedirectTo:location.origin+location.pathname}});
     auth.busy=false; if(error){ auth.err=/seconds/i.test(error.message)?'Un e-mail vient de partir : attends une minute avant d’en redemander un.':/rate|limit/i.test(error.message)?'Trop d’e-mails envoyés pour le moment. Si tu as déjà reçu un e-mail de connexion, utilise son lien. Sinon, réessaie un peu plus tard.':'Impossible d’envoyer le code. Vérifie ton adresse et réessaie.'; }
     else auth.step='code';
@@ -1120,7 +1122,7 @@ async function afterLogin(user){
   if(me.role==='coach'&&!kids.some(k=>k.name)) location.hash='coachs';
   render();
 }
-async function logout(){ if(pushing) await pushing; try{ await sb.auth.signOut(); }catch(e){} me=null; coachOn=false; auth={step:'email',email:'',busy:false,err:''}; location.hash='accueil'; renderAuth(); }
+async function logout(){ if(pushing) await pushing; try{ await sb.auth.signOut({scope:'local'}); }catch(e){} me=null; coachOn=false; auth={step:'email',email:'',busy:false,err:''}; location.hash='accueil'; renderAuth(); }
 
 /* ---------- messagerie en ligne ---------- */
 let liveMsgs={}, seenAt=store.get('seenAt',null), delPending=null, pendingSend=null, msgSig='';
