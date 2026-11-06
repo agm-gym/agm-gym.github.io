@@ -271,6 +271,9 @@ body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-conten
 .fam-who{display:flex;flex-direction:column;gap:6px}.fam-who small{color:var(--muted);font-weight:600}
 .fam-act{display:flex;align-items:center;gap:14px}
 .pend-kids{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.push-card{position:relative;display:flex;gap:12px;align-items:flex-start;margin:14px 0;padding:16px 40px 16px 16px;border-radius:18px;background:var(--surface);border:1.5px solid var(--line);box-shadow:0 4px 18px rgba(60,30,100,.06)}
+.push-card .push-ic{font-size:26px;line-height:1}.push-card b{font-size:15px}.push-card p{margin:4px 0 10px;color:var(--muted);font-size:14px;line-height:1.4}.push-card p:last-child{margin-bottom:0}
+.push-card .x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:15px;cursor:pointer}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-tip{font-size:13.5px!important;max-width:34ch}
@@ -1128,6 +1131,7 @@ async function afterLogin(user){
   onb=null; rolePick=(!kids.some(k=>k.name)&&me.role!=='coach')?{step:'choose'}:null;
   if(me.role==='coach'&&!kids.some(k=>k.name)) location.hash='coachs';
   render();
+  savePushSub(false).then(ok=>{ if(ok) render(); });
 }
 async function logout(){ if(pushing) await pushing; try{ await sb.auth.signOut({scope:'local'}); }catch(e){} me=null; coachOn=false; auth={step:'email',email:'',busy:false,err:''}; location.hash='accueil'; renderAuth(); }
 
@@ -1336,6 +1340,36 @@ document.addEventListener('click',async e=>{
   try{ await pull(); }catch(err){} famSheet(); render(); toast(ok?'✓ Famille validée':'Demande refusée');
 });
 
+
+/* ---------- notifications ---------- */
+const VAPID_PUBLIC='BMGvj_FNC9jj82yo0CQIMD1B9JgaIf-gMLFdqkqIHhEtkvtmyCcwKARwbYFvHvn_96O1xwL152tUNfgJy_8tbBA';
+const pushOK=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:';
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+let pushOn=false;
+const b64u=s=>{const p='='.repeat((4-s.length%4)%4);const r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...r].map(c=>c.charCodeAt(0)))};
+async function savePushSub(ask){
+  if(!pushOK()||!me) return false;
+  if(ask){ const perm=await Notification.requestPermission(); if(perm!=='granted'){ toast(perm==='denied'?'Notifications bloquées : autorise-les dans les réglages du navigateur':'Notifications non activées'); return false; } }
+  else if(Notification.permission!=='granted') return false;
+  try{
+    const reg=await navigator.serviceWorker.ready; let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
+    const j=sub.toJSON(); const {error}=await sb.from('push_subs').upsert({endpoint:j.endpoint,user_id:me.id,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'});
+    if(error) throw error; pushOn=true; return true;
+  }catch(e){ console.warn('push',e); if(ask) toast('⚠️ Impossible d’activer les notifications sur cet appareil'); return false; }
+}
+function pushCard(){
+  if(!LIVE||!me||pushOn||store.get('pushHide',false)) return '';
+  if(isIOS&&!isStandalone()) return `<div class="push-card"><span class="push-ic" aria-hidden="true">🔔</span><div><b>Recevoir les notifications</b><p>Sur iPhone : touche <b>Partager</b> <span aria-hidden="true">⬆️</span> puis <b>Sur l’écran d’accueil</b>, et ouvre l’appli depuis l’icône.</p></div><button class="x" data-pushhide aria-label="Masquer">✕</button></div>`;
+  if(!pushOK()||Notification.permission==='denied') return '';
+  return `<div class="push-card"><span class="push-ic" aria-hidden="true">🔔</span><div><b>Ne rate rien</b><p>Messages, nouveaux événements, sélections en compétition : sois prévenu·e sur ton téléphone.</p><button class="btn sm" data-pushon>Activer les notifications</button></div><button class="x" data-pushhide aria-label="Masquer">✕</button></div>`;
+}
+document.addEventListener('click',async e=>{
+  if(e.target.closest('[data-pushon]')){ const ok=await savePushSub(true); if(ok){ toast('🔔 Notifications activées'); render(); } return; }
+  if(e.target.closest('[data-pushhide]')){ store.set('pushHide',true); render(); }
+});
+
 async function liveBoot(){
   document.body.classList.add('live'); onb=null;
   try{ await loadSb(); }catch(e){ document.getElementById('view').innerHTML='<div class="empty" style="margin-top:30vh">Impossible de charger l’appli : vérifie ta connexion puis recharge la page.</div>'; return; }
@@ -1489,6 +1523,7 @@ function vAccueil(){
     <span class="pn-grp">${k.group}<br>${stars(g.n)}</span></div>
     ${rsvpControl(k,next,true)}
   </section>`:'<div class="empty">Pas de cours prévu.</div>'}
+  ${pushCard()}
   ${todoList(k,real)}
   <div class="dash">
     ${tile('#planning','',pending||'✓',pending?'cours à répondre':'Présences à jour',pending?'warn':'good','📅')}
@@ -1705,7 +1740,7 @@ function vCoachs(){
   const g=coachGroup; const s=coachNext(g);
   const tabs=[['appel','✓ Appel'],['prog','🗒️ Prog.'],['compet','🏅 Compét'],['badges','★ Badges']];
   return `
-  ${coachBar()}${coachNav('coachs')}${LIVE&&pendingFamilies().length?`<button class="fam-banner" data-fam>👋 <b>${pendingFamilies().length} famille${pendingFamilies().length>1?'s':''}</b> en attente de validation <span aria-hidden="true">›</span></button>`:''}
+  ${coachBar()}${coachNav('coachs')}${LIVE&&pendingFamilies().length?`<button class="fam-banner" data-fam>👋 <b>${pendingFamilies().length} famille${pendingFamilies().length>1?'s':''}</b> en attente de validation <span aria-hidden="true">›</span></button>`:''}${pushCard()}
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${presenceBoard(g,s)}
