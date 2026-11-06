@@ -278,6 +278,15 @@ body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-conten
 .ev-date{opacity:.85}.ev-date b{font-size:15px}
 .csel-sum{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .csel-grp{border-top:1px solid var(--line);padding:10px 0}.csel-grp summary{cursor:pointer;display:flex;align-items:center;gap:8px;font-size:15px;list-style:none}.csel-grp summary::-webkit-details-marker{display:none}.csel-grp summary .sess-meta{margin-left:auto}.csel-grp summary::after{content:'▾';color:var(--muted)}.csel-grp[open] summary::after{content:'▴'}.csel-grp .roll{margin-top:10px}
+.seg.two{grid-template-columns:1fr 1fr;margin:6px 0 10px}
+.club-list{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column}
+.club-list li{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.ev-groups[hidden]{display:none!important}
+.club-list .link{font-size:13px;white-space:nowrap}
+.club-list .cl-main{flex:1;min-width:0;display:flex;flex-direction:column}.club-list small{color:var(--muted);font-weight:600}
+.cl-h{display:flex;align-items:center;gap:8px;margin:14px 0 2px;font-size:15px}
+.club-form{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding:14px;border-radius:14px;background:var(--surface-2)}
+.club-form .ackline{display:flex;align-items:center;gap:10px;font-weight:700;font-size:14px}.club-act{display:flex;align-items:center;gap:14px}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-tip{font-size:13.5px!important;max-width:34ch}
@@ -1082,6 +1091,7 @@ async function pull(){
   customPlans={}; PL.forEach(r=>{customPlans[`${r.grp}|${r.session_key}`]=r.content});
   last={}; Object.keys(TABLES).forEach(t=>last[t]=snap(t));
   try{ await pullEvents(); }catch(e){ console.warn('events',e); }
+  try{ await pullClubLists(); }catch(e){ console.warn('club lists',e); }
   try{ await pullMsgs(); }catch(e){ console.warn('msgs',e); }
 }
 const busyUI=()=>document.getElementById('layer').innerHTML||(onb&&!LIVE)||document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
@@ -1375,6 +1385,63 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('[data-pushhide]')){ store.set('pushHide',true); render(); }
 });
 
+
+/* ---------- skills et exercices du club ---------- */
+async function pullClubLists(){
+  const {data:S,error}=await sb.from('club_skills').select('*').order('position').order('name'); if(!error&&S) ELEMENTS=S.map(r=>({id:r.id,k:r.k,name:esc(r.name),groups:r.groups&&!r.groups.includes('all')?r.groups:'all',raw:r}));
+  if(me&&me.role==='coach'){ const {data:E,error:e2}=await sb.from('club_exercises').select('*').order('k').order('name'); if(!e2&&E) EXOS=E.map(r=>({id:r.id,k:r.k,name:r.name,min:r.minutes})); }
+}
+let clubTab='skills', clubEdit=null;
+const SKILL_K=['sol','poutre','barres','saut','echauf','jeu','etire'];
+function clubSheet(tab){
+  if(tab) clubTab=tab;
+  const gl=g=>!g||g==='all'?'Tous les groupes':g.join(', ');
+  const editS=clubEdit&&clubEdit.t==='skills'?ELEMENTS.find(x=>x.id===clubEdit.id):null;
+  const editE=clubEdit&&clubEdit.t==='exos'?EXOS.find(x=>x.id===clubEdit.id):null;
+  const kSel=(id,cur)=>`<select id="${id}" aria-label="Agrès">${SKILL_K.map(k=>`<option value="${k}" ${cur===k?'selected':''}>${APPARATUS[k].name}</option>`).join('')}</select>`;
+  const body=clubTab==='skills'
+    ?`<p class="hint">Les skills validés par les coachs apparaissent dans le suivi de chaque gymnaste, visible par ses parents.</p>
+      <ul class="club-list">${ELEMENTS.map(e=>`<li>${ico(e.k,'sm')}<span class="cl-main"><b>${e.name}</b><small>${APPARATUS[e.k]?APPARATUS[e.k].name:''} · ${gl(e.groups)}</small></span><button class="link" data-cledit="skills|${e.id}">Modifier</button><button class="link danger" data-cldel="skills|${e.id}">Supprimer</button></li>`).join('')||'<li class="pnone">Aucun skill pour l’instant</li>'}</ul>
+      <form id="clubForm" data-t="skills" class="club-form"><b>${editS?'✏️ Modifier le skill':'＋ Ajouter un skill'}</b>
+        <div class="ex-fields"><input id="clName" required maxlength="60" placeholder="Ex. : Salto avant" value="${editS?editS.name:''}" aria-label="Nom du skill">${kSel('clK',editS?editS.k:'sol')}</div>
+        <label class="ackline"><input type="checkbox" id="clAll" ${!editS||editS.groups==='all'?'checked':''}> Pour tous les groupes</label>
+        <div class="ev-groups" ${!editS||editS.groups==='all'?'hidden':''}>${Object.keys(GROUPS).map(g=>`<label class="chip-check"><input type="checkbox" name="clg" value="${g}" ${editS&&editS.groups!=='all'&&editS.groups.includes(g)?'checked':''}>${g}</label>`).join('')}</div>
+        <div class="club-act"><button class="btn" type="submit">${editS?'Enregistrer':'Ajouter'}</button>${editS?'<button type="button" class="link" data-clcancel>Annuler</button>':''}</div></form>`
+    :`<p class="hint">La banque d’exercices sert à préparer le programme des cours. Elle est commune à tous les coachs.</p>
+      ${SKILL_K.filter(k=>EXOS.some(x=>x.k===k)).map(k=>`<h4 class="cl-h">${ico(k,'sm')} ${APPARATUS[k].name}</h4><ul class="club-list">${EXOS.filter(x=>x.k===k).map(x=>`<li><span class="cl-main"><b>${esc(x.name)}</b><small>${x.min} min</small></span><button class="link" data-cledit="exos|${x.id}">Modifier</button><button class="link danger" data-cldel="exos|${x.id}">Supprimer</button></li>`).join('')}</ul>`).join('')||'<p class="pnone">Aucun exercice</p>'}
+      <form id="clubForm" data-t="exos" class="club-form"><b>${editE?'✏️ Modifier l’exercice':'＋ Ajouter un exercice'}</b>
+        <div class="ex-fields"><input id="clName" required maxlength="60" placeholder="Ex. : Parcours de motricité" value="${editE?esc(editE.name):''}" aria-label="Nom de l’exercice">${kSel('clK',editE?editE.k:'sol')}</div>
+        <div class="field" style="max-width:160px"><label for="clMin">Durée (min)</label><input id="clMin" type="number" min="1" max="120" value="${editE?editE.min:10}"></div>
+        <div class="club-act"><button class="btn" type="submit">${editE?'Enregistrer':'Ajouter'}</button>${editE?'<button type="button" class="link" data-clcancel>Annuler</button>':''}</div></form>`;
+  openSheet(`<h2 class="sheet-title">⚙️ Skills et exercices du club</h2>
+    <div class="seg two" role="tablist"><button role="tab" data-cltab="skills" aria-selected="${clubTab==='skills'}">★ Skills</button><button role="tab" data-cltab="exos" aria-selected="${clubTab==='exos'}">📚 Exercices</button></div>${body}`);
+}
+async function clubReload(){ if(LIVE){ try{ await pullClubLists(); }catch(e){} } clubSheet(); render(); }
+document.addEventListener('change',e=>{ if(e.target.id==='clAll'){ const g=document.querySelector('#clubForm .ev-groups'); if(g) g.hidden=e.target.checked; } });
+document.addEventListener('click',async e=>{
+  const c=e.target.closest('[data-club]'); if(c){ clubEdit=null; clubSheet(c.dataset.club); return; }
+  const t=e.target.closest('[data-cltab]'); if(t){ clubEdit=null; clubSheet(t.dataset.cltab); return; }
+  const ed=e.target.closest('[data-cledit]'); if(ed){ const [tt,id]=ed.dataset.cledit.split('|'); clubEdit={t:tt,id}; clubSheet(); document.getElementById('clName')?.scrollIntoView({block:'center'}); return; }
+  if(e.target.closest('[data-clcancel]')){ clubEdit=null; clubSheet(); return; }
+  const del=e.target.closest('[data-cldel]'); if(del){ if(del.dataset.armed!=='1'){ del.dataset.armed='1'; del.textContent='Confirmer'; return; }
+    const [tt,id]=del.dataset.cldel.split('|');
+    if(LIVE){ const {error}=await sb.from(tt==='skills'?'club_skills':'club_exercises').delete().eq('id',id); if(error){ toast('⚠️ Suppression impossible'); return; } }
+    else if(tt==='skills') ELEMENTS=ELEMENTS.filter(x=>x.id!==id); else EXOS=EXOS.filter(x=>x.id!==id);
+    clubEdit=null; toast('Supprimé'); clubReload(); }
+});
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='clubForm') return; e.preventDefault();
+  const tt=e.target.dataset.t, name=document.getElementById('clName').value.trim(), k=document.getElementById('clK').value; if(!name) return;
+  let row;
+  if(tt==='skills'){ const all=document.getElementById('clAll').checked, gs=[...e.target.querySelectorAll('[name=clg]:checked')].map(x=>x.value); if(!all&&!gs.length){ toast('Choisis au moins un groupe'); return; } row={name,k,groups:all?['all']:gs}; }
+  else row={name,k,minutes:Math.max(1,Math.min(120,+document.getElementById('clMin').value||10))};
+  const editing=clubEdit&&clubEdit.t===tt?clubEdit.id:null;
+  if(LIVE){ const tbl=tt==='skills'?'club_skills':'club_exercises'; const {error}=editing?await sb.from(tbl).update(row).eq('id',editing):await sb.from(tbl).insert(tt==='skills'?{...row,position:(ELEMENTS.length+1)*10}:row); if(error){ toast('⚠️ Enregistrement impossible'); return; } }
+  else if(tt==='skills'){ const v={id:editing||('s'+Date.now()),k,name:esc(name),groups:row.groups.includes('all')?'all':row.groups}; ELEMENTS=editing?ELEMENTS.map(x=>x.id===editing?v:x):[...ELEMENTS,v]; }
+  else { const v={id:editing||('x'+Date.now()),k,name,min:row.minutes}; EXOS=editing?EXOS.map(x=>x.id===editing?v:x):[...EXOS,v]; }
+  toast(editing?'✓ Modifié':'✓ Ajouté'); clubEdit=null; clubReload();
+});
+
 async function liveBoot(){
   document.body.classList.add('live'); onb=null;
   try{ await loadSb(); }catch(e){ document.getElementById('view').innerHTML='<div class="empty" style="margin-top:30vh">Impossible de charger l’appli : vérifie ta connexion puis recharge la page.</div>'; return; }
@@ -1535,7 +1602,7 @@ function vAccueil(){
     ${tile('#planning','',pending||'✓',pending?'cours à répondre':'Présences à jour',pending?'warn':'good','📅')}
     ${tile('#messages','',unread||'0',unread>1?'messages non lus':'message non lu',unread?'info':'calm','💬')}
     ${tile('#docs','',docsTodo||'✓',docsTodo?(docsTodo>1?'documents à donner':'document à donner'):'Documents à jour',docsTodo?'warn':'good','📄')}
-    ${tile('','data-mybadges',`${nb}<small>/${ELEMENTS.length}</small>`,'skills validés','star','⚡')}
+    ${tile('','data-mybadges',`${nb}<small>/${skillsFor(k.group).length}</small>`,'skills validés','star','⚡')}
   </div>
   ${nextEv?`<section class="kid-card"><div class="sh"><h2>Prochain événement</h2><a class="link" href="#agenda">Agenda ›</a></div><div class="events one">${eventCard(nextEv,k)}</div></section>`:''}`;
 }
@@ -1633,11 +1700,12 @@ function seeded(g,i){let x=(g.charCodeAt(4)*97+i*31)%100;return x/100}
 /* ================= espace coachs ================= */
 const BNAMES=['Léo','Alba','Gabin','Rose','Malo','Jeanne','Noé','Lou','Sacha','Mila','Arthur','Nina','Paul','Romy','Timéo','Iris','Ezio','Lila','Nolan','Zélie','Louis','Ava','Marius','Anna','Elio','Lucie','Basile','Inaya','Raphaël','Suzanne','Côme','Olivia'];
 const NAMES=['Jade','Inès','Rose','Lou','Zoé','Emma','Léna','Chloé','Manon','Anna','Lina','Mia','Sofia','Alba','Nina','Romy','Ambre','Louise','Margaux','Iris','Julia','Lola','Elsa','Agathe','Mila','Capucine','Valentine','Clara','Héloïse','Maëlle','Céleste','Victoire','Juliette','Noémie','Ella','Rosalie','Lisa','Camille','Eva','Léonie','Alice','Jeanne'];
-const ELEMENTS=[
+let ELEMENTS=[
   {id:'rav',k:'sol',name:'Roulade avant'},{id:'rar',k:'sol',name:'Roulade arrière'},{id:'chd',k:'sol',name:'Chandelle'},{id:'pont',k:'sol',name:'Pont'},
   {id:'roue',k:'sol',name:'Roue'},{id:'atr',k:'sol',name:'Poirier'},{id:'eqp',k:'poutre',name:'Équilibre poutre'},{id:'dtp',k:'poutre',name:'Demi-tour poutre'},
   {id:'apb',k:'barres',name:'Appui barres'},{id:'bal',k:'barres',name:'Balancés'},{id:'sext',k:'saut',name:'Saut extension'},{id:'sgr',k:'saut',name:'Saut groupé'},
 ];
+const skillsFor=g=>ELEMENTS.filter(e=>!e.groups||e.groups==='all'||e.groups.includes('all')||e.groups.includes(g));
 let coachGroup=store.get('cgroup','GAF 1'), coachTab=store.get('ctab','appel'); if(coachTab==='music') coachTab='appel';
 let appel=store.get('appel',{}), appelDone=store.get('appelDone',{}), customPlans=store.get('plans',{});
 let badges=store.get('badges',{'GAF 1|Lia':['rav','chd','sext']}), badgeGym=null, draft=null, picker=false;
@@ -1730,9 +1798,10 @@ function coachBadges(g){
   if(!badgeGym||!list.some(x=>x.name===badgeGym)) badgeGym=list[0].name;
   const got=badges[`${g}|${badgeGym}`]||[];
   return `<div class="gym-pick">${list.map(gym=>{const n=(badges[`${g}|${gym.name}`]||[]).length;return `<button class="kid" data-bgym="${esc(gym.name)}" aria-pressed="${gym.name===badgeGym}">${avatar(gym.name)}${esc(gym.name)}${n?` <small>★${n}</small>`:''}</button>`}).join('')}</div>
-  <div class="call-head"><b>${esc(badgeGym)}</b><span class="pill ok">★ ${got.length} / ${ELEMENTS.length}</span></div>
-  <div class="badges">${ELEMENTS.map(el=>{const on=got.includes(el.id);return `<button class="badge-el${on?' on':''}" data-el="${el.id}" aria-pressed="${on}">${ico(el.k)}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">★</i>':''}</button>`}).join('')}</div>
+  <div class="call-head"><b>${esc(badgeGym)}</b><span class="pill ok">★ ${got.filter(id=>skillsFor(g).some(e=>e.id===id)).length} / ${skillsFor(g).length}</span></div>
+  <div class="badges">${skillsFor(g).map(el=>{const on=got.includes(el.id);return `<button class="badge-el${on?' on':''}" data-el="${el.id}" aria-pressed="${on}">${ico(el.k)}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">★</i>':''}</button>`}).join('')}</div>
   <p class="hint">Touche un élément réussi : il apparaît dans le suivi de la gymnaste, visible par ses parents.</p>
+  <button class="btn ghost" data-club="skills">⚙️ Personnaliser les skills du club</button>
 `;
 }
 let coachOn=false, pin='';
@@ -1761,8 +1830,8 @@ function vCoachs(){
 }
 function myBadges(k){
   const got=badges[`${k.group}|${k.name}`]||[];
-  return `<section class="col"><div class="sh"><h2>Les skills de ${esc(k.name)}</h2><span class="pill ok">★ ${got.length} / ${ELEMENTS.length}</span></div>
-    <div class="badges mine">${ELEMENTS.map(el=>{const on=got.includes(el.id);return `<div class="badge-el${on?' on':''}" title="${el.name}">${ico(el.k,'sm')}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">★</i>':''}</div>`}).join('')}</div></section>`;
+  return `<section class="col"><div class="sh"><h2>Les skills de ${esc(k.name)}</h2><span class="pill ok">★ ${got.filter(id=>skillsFor(k.group).some(e=>e.id===id)).length} / ${skillsFor(k.group).length}</span></div>
+    <div class="badges mine">${skillsFor(k.group).map(el=>{const on=got.includes(el.id);return `<div class="badge-el${on?' on':''}" title="${el.name}">${ico(el.k,'sm')}<span>${el.name}</span>${on?'<i class="bstar" aria-hidden="true">★</i>':''}</div>`}).join('')}</div></section>`;
 }
 /* ================= photos (emplacements d'exemple) ================= */
 const ALBUMS = [
@@ -1910,11 +1979,13 @@ const BANK={
 };
 const GEAR={echauf:'Cordes à sauter, plots',sol:'Praticable et tapis',poutre:'Poutre basse et tapis',barres:'Barres et tapis de réception',saut:'Tremplin et plinth',jeu:'Ballons et chasubles',etire:'Tapis individuels'};
 let myEx=store.get('myEx',[]), bankF='all', bankAdded=0;
+let EXOS=Object.entries(BANK).flatMap(([k,l])=>l.map(([n,m],i)=>({id:k+'-'+i,k,name:n,min:m})));
 function bankSheet(){
-  const items=[...Object.entries(BANK).flatMap(([k,l])=>l.map(([n,m])=>({k,n,m,mine:false}))),...myEx.map(x=>({...x,mine:true}))].filter(x=>bankF==='all'||x.k===bankF);
+  const items=[...EXOS.map(x=>({k:x.k,n:x.name,m:x.min,mine:false})),...(LIVE?[]:myEx.map(x=>({...x,mine:true})))].filter(x=>bankF==='all'||x.k===bankF);
   const inProg=n=>draft&&draft.steps.some(st=>st[2]===n);
   openSheet(`<h2>📚 Banque d’exercices</h2>
-  <div class="filters bank-f">${[['all','Tout']].concat(Object.keys(BANK).map(k=>[k,APPARATUS[k].name])).map(([k,l])=>`<button class="chip${k!=='all'?' ic':''}" data-bankf="${k}" aria-pressed="${bankF===k}">${k!=='all'?ico(k,'sm'):''}${l}</button>`).join('')}</div>
+  <button class="link" data-club="exos" style="align-self:flex-start">⚙️ Gérer la banque du club</button>
+  <div class="filters bank-f">${[['all','Tout']].concat(Object.keys(APPARATUS).filter(k=>EXOS.some(x=>x.k===k)).map(k=>[k,APPARATUS[k].name])).map(([k,l])=>`<button class="chip${k!=='all'?' ic':''}" data-bankf="${k}" aria-pressed="${bankF===k}">${k!=='all'?ico(k,'sm'):''}${l}</button>`).join('')}</div>
   <div class="bank">${items.map(x=>`<div class="bank-row">${ico(x.k,'sm')}<span class="song-main"><b>${esc(x.n)}</b><small>${APPARATUS[x.k].name} · ${x.m} min${x.mine?' · Mon exercice':''}</small></span>
     ${inProg(x.n)?'<span class="pill ok">✓ Ajouté</span>':`<button class="add-ex" data-addex="${x.k}|${x.m}|${esc(x.n)}" aria-label="Ajouter ${esc(x.n)}">+</button>`}</div>`).join('')}</div>
   <form id="exForm" class="ex-form"><b>✏️ Créer mon exercice</b>
@@ -2136,6 +2207,7 @@ document.addEventListener('change',e=>{
 });
 document.addEventListener('submit',e=>{
   if(e.target.id==='exForm'){ e.preventDefault(); const n=document.getElementById('exName').value.trim(); if(!n) return; const k=document.getElementById('exK').value;
+    if(LIVE){ sb.from('club_exercises').insert({k,name:n,minutes:10}).then(async({error})=>{ if(error){toast('⚠️ Ajout impossible');return} await pullClubLists(); bankF=k; bankSheet(); toast('✏️ Exercice ajouté à la banque du club'); }); return; }
     myEx.push({k,n,m:10}); store.set('myEx',myEx); bankF=k; bankSheet(); toast('✏️ Exercice ajouté à ta banque'); return; }
   if(e.target.id==='absForm'){ e.preventDefault(); const list=absRange(); if(!list.length){toast('Aucun cours sur cette période');return}
     const r=(document.querySelector('[name=absR]:checked')||{}).value, k=kid(); list.forEach(s=>{const key=keyFor(k,s); rsvp[key]='no'; if(r) reasons[key]=r;});
