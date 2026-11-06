@@ -5,7 +5,14 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const VAPID_PUBLIC = "BMGvj_FNC9jj82yo0CQIMD1B9JgaIf-gMLFdqkqIHhEtkvtmyCcwKARwbYFvHvn_96O1xwL152tUNfgJy_8tbBA";
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-webpush.setVapidDetails("mailto:academie.gym.med@gmail.com", VAPID_PUBLIC, Deno.env.get("VAPID_PRIVATE")!);
+let vapidReady = "";
+function initVapid(): string {
+  if (vapidReady === "ok") return "ok";
+  const priv = (Deno.env.get("VAPID_PRIVATE") ?? "").trim().replace(/^["']|["']$/g, "");
+  if (!priv) return (vapidReady = "secret VAPID_PRIVATE manquant");
+  try { webpush.setVapidDetails("mailto:academie.gym.med@gmail.com", VAPID_PUBLIC, priv); return (vapidReady = "ok"); }
+  catch (e) { return (vapidReady = "clé VAPID_PRIVATE invalide (" + (e as Error).message + ")"); }
+}
 
 const FRESH_MS = 10 * 60 * 1000; // on ne notifie que ce qui vient d'être créé
 const fresh = (iso?: string) => !iso || Date.now() - new Date(iso).getTime() < FRESH_MS;
@@ -29,6 +36,9 @@ async function parentsOfGroups(groups: string[] | null): Promise<string[]> {
 Deno.serve(async (req) => {
   const { type, id } = await req.json().catch(() => ({}));
   if (!type || !id) return new Response("bad request", { status: 400 });
+  const v = initVapid();
+  if (v !== "ok") return new Response(v, { status: 500 });
+  if (type === "test") return new Response("ok : la fonction et la clé fonctionnent");
 
   // une seule fois par élément
   const { error: dup } = await sb.from("push_log").insert({ kind: type, ref: String(id) });
