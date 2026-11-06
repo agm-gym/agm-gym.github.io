@@ -271,6 +271,7 @@ body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-conten
 .fam-who{display:flex;flex-direction:column;gap:6px}.fam-who small{color:var(--muted);font-weight:600}
 .fam-act{display:flex;align-items:center;gap:14px}
 .pend-kids{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.notif-row{display:flex;align-items:center;gap:12px;margin:18px 0 6px;padding:14px 16px;border-radius:16px;background:var(--surface);border:1.5px solid var(--line)}.notif-row>div{flex:1;min-width:0}.notif-row p{margin:2px 0 0;color:var(--muted);font-size:13.5px;line-height:1.4}.notif-row .push-ic{font-size:22px}
 .push-card{position:relative;display:flex;gap:12px;align-items:flex-start;margin:14px 0;padding:16px 40px 16px 16px;border-radius:18px;background:var(--surface);border:1.5px solid var(--line);box-shadow:0 4px 18px rgba(60,30,100,.06)}
 .push-card .push-ic{font-size:26px;line-height:1}.push-card b{font-size:15px}.push-card p{margin:4px 0 10px;color:var(--muted);font-size:14px;line-height:1.4}.push-card p:last-child{margin-bottom:0}
 .push-card .x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:15px;cursor:pointer}
@@ -1374,6 +1375,16 @@ async function savePushSub(ask){
     if(error) throw error; pushOn=true; return true;
   }catch(e){ console.warn('push',e); if(ask) toast('⚠️ Impossible d’activer les notifications sur cet appareil'); return false; }
 }
+function notifRow(){
+  if(!LIVE||!me) return '';
+  let st, act='';
+  if(pushOn) st='✅ Activées sur cet appareil';
+  else if(isIOS&&!isStandalone()) st='📲 Sur iPhone : touche <b>Partager</b> puis <b>Sur l’écran d’accueil</b>, et ouvre l’appli depuis l’icône pour pouvoir les activer.';
+  else if(!pushOK()) st='⚠️ Ce navigateur ne gère pas les notifications. Ouvre <b>agm-gym.github.io</b> dans <b>Chrome</b> (Android) ou <b>Safari</b> (iPhone), pas depuis WhatsApp.';
+  else if(Notification.permission==='denied') st='🚫 Bloquées : autorise les notifications pour agm-gym.github.io dans les réglages du navigateur (icône 🔒 à gauche de l’adresse › Autorisations), puis recharge la page.';
+  else { st='Désactivées'; act='<button class="btn sm" data-pushon>Activer</button>'; }
+  return `<div class="notif-row"><span class="push-ic" aria-hidden="true">🔔</span><div><b>Notifications</b><p>${st}</p></div>${act}</div>`;
+}
 function pushCard(){
   if(!LIVE||!me||pushOn||store.get('pushHide',false)) return '';
   if(isIOS&&!isStandalone()) return `<div class="push-card"><span class="push-ic" aria-hidden="true">🔔</span><div><b>Recevoir les notifications</b><p>Sur iPhone : touche <b>Partager</b> <span aria-hidden="true">⬆️</span> puis <b>Sur l’écran d’accueil</b>, et ouvre l’appli depuis l’icône.</p></div><button class="x" data-pushhide aria-label="Masquer">✕</button></div>`;
@@ -1596,7 +1607,7 @@ function vAccueil(){
     <span class="pn-grp">${k.group}<br>${stars(g.n)}</span></div>
     ${rsvpControl(k,next,true)}
   </section>`:'<div class="empty">Pas de cours prévu.</div>'}
-  ${pushCard()}
+  ${pushCard()||(LIVE&&me&&!pushOn&&!store.get('pushHide',false)?notifRow():'')}
   ${todoList(k,real)}
   <div class="dash">
     ${tile('#planning','',pending||'✓',pending?'cours à répondre':'Présences à jour',pending?'warn':'good','📅')}
@@ -1820,7 +1831,7 @@ function vCoachs(){
   const g=coachGroup; const s=coachNext(g);
   const tabs=[['appel','✓ Appel'],['prog','🗒️ Prog.'],['compet','🏅 Compét'],['badges','★ Badges']];
   return `
-  ${coachBar()}${coachNav('coachs')}${LIVE&&pendingFamilies().length?`<button class="fam-banner" data-fam>👋 <b>${pendingFamilies().length} famille${pendingFamilies().length>1?'s':''}</b> en attente de validation <span aria-hidden="true">›</span></button>`:''}${pushCard()}
+  ${coachBar()}${coachNav('coachs')}${LIVE&&pendingFamilies().length?`<button class="fam-banner" data-fam>👋 <b>${pendingFamilies().length} famille${pendingFamilies().length>1?'s':''}</b> en attente de validation <span aria-hidden="true">›</span></button>`:''}${pushCard()||(pushOn?'':notifRow())}
   <h1 class="hello">Espace <span class="script">coachs</span></h1>
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${presenceBoard(g,s)}
@@ -2068,7 +2079,7 @@ function vHub(seg){
   const docsTodo=TODO_DOCS.filter(d=>!(sent[`${kid().id}|${d.id}`]||d.init==='done')).length;
   return `<div class="club-head"><img class="logo" src="${LOGO}" alt="" width="64" height="64"><h1 class="hello">Le <span class="script">club</span></h1></div>
   <div class="seg" role="tablist">${segs.map(([id,l])=>`<a role="tab" href="#${id==='infos'?'club':id}" aria-selected="${seg===id}">${l}${id==='docs'&&docsTodo?` <i class="dotbadge">${docsTodo}</i>`:''}</a>`).join('')}</div>
-  ${strip(seg==='photos'?vPhotos():seg==='docs'?vDocs():vClub())}${LIVE&&me?`<p class="acct">Connecté·e avec ${esc(me.email)} · <a href="#" data-logout>Se déconnecter</a></p>`:''}`;
+  ${strip(seg==='photos'?vPhotos():seg==='docs'?vDocs():vClub())}${notifRow()}${LIVE&&me?`<p class="acct">Connecté·e avec ${esc(me.email)} · <a href="#" data-logout>Se déconnecter</a></p>`:''}`;
 }
 function render(){
   applyTheme(); applyLook();
