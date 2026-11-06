@@ -274,6 +274,10 @@ body.live .coach-bar .sess-meta{display:none}body.live .coach-bar{justify-conten
 .push-card{position:relative;display:flex;gap:12px;align-items:flex-start;margin:14px 0;padding:16px 40px 16px 16px;border-radius:18px;background:var(--surface);border:1.5px solid var(--line);box-shadow:0 4px 18px rgba(60,30,100,.06)}
 .push-card .push-ic{font-size:26px;line-height:1}.push-card b{font-size:15px}.push-card p{margin:4px 0 10px;color:var(--muted);font-size:14px;line-height:1.4}.push-card p:last-child{margin-bottom:0}
 .push-card .x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:15px;cursor:pointer}
+.team-box{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;background:var(--surface-2)}.team-box .pname.me{outline:2px solid var(--violet)}
+.ev-date{opacity:.85}.ev-date b{font-size:15px}
+.csel-sum{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.csel-grp{border-top:1px solid var(--line);padding:10px 0}.csel-grp summary{cursor:pointer;display:flex;align-items:center;gap:8px;font-size:15px;list-style:none}.csel-grp summary::-webkit-details-marker{display:none}.csel-grp summary .sess-meta{margin-left:auto}.csel-grp summary::after{content:'▾';color:var(--muted)}.csel-grp[open] summary::after{content:'▴'}.csel-grp .roll{margin-top:10px}
 .readonly-note{margin:0;padding:14px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;border-top:1px solid var(--line)}
 .delmsg{font-size:12px;font-weight:700;color:var(--muted);padding:0 0 0 8px}
 .auth-tip{font-size:13.5px!important;max-width:34ch}
@@ -930,7 +934,7 @@ let EVENTS = [
   {id:'e4',kind:'stage',date:'2026-12-21',end:'2026-12-23',time:'9:00 – 12:00',title:'Stage de Noël GAF',text:'Trois matinées pour travailler poutre et sol, avec un mini-show le dernier jour.',groups:['GAF 1','GAF 2','GAF 3'],cap:24,taken:17,price:'45 € les 3 matinées'},
   {id:'e5',kind:'compet',date:'2027-01-24',time:'Journée',title:'Compétition départementale FFGym',text:'1ʳᵉ compétition de la saison. Les coachs ont fait la sélection : il reste à confirmer la présence. Convocation et horaires de passage envoyés 10 jours avant.',groups:['GAF 1','GAF 2','GAF 3'],cap:14,taken:9,price:'Engagement 15 €'},
   {id:'e6',kind:'stage',date:'2027-02-22',end:'2027-02-24',time:'9:00 – 12:00',title:'Stage d’hiver',text:'Acrobatie, souplesse et jeux d’équipe. Ouvert aux gymnastes GAF de tous niveaux.',groups:['GAF 1','GAF 2','GAF 3'],cap:24,taken:4,price:'45 € les 3 matinées'},
-  {id:'e7',kind:'compet',date:'2027-03-21',time:'Journée',title:'Compétition interclubs du Var',text:'2ᵉ compétition de la saison, avec les clubs du Var. Les coachs ont fait la sélection : il reste à confirmer la présence.',groups:['GAF 1','GAF 2','GAF 3'],cap:28,taken:6,price:'Engagement 15 €'},
+  {id:'e7',kind:'compet',date:'2027-03-21',time:'Journée',title:'Compétition interclubs du Var',team:true,text:'2ᵉ compétition de la saison, avec les clubs du Var. Les coachs ont fait la sélection : il reste à confirmer la présence.',groups:['GAF 1','GAF 2','GAF 3'],cap:28,taken:6,price:'Engagement 15 €'},
   {id:'e8',kind:'fort',date:'2027-06-19',time:'15:00',title:'Gala de fin d’année',text:'Le grand spectacle de la saison, tous les groupes sur scène. Billetterie familles.',groups:'all',cap:300,taken:12,guests:true,price:'5 € la place adulte'},
 ];
 const KIND = {stage:'Stage',compet:'Compétition',fort:'Temps fort'};
@@ -1234,7 +1238,7 @@ document.addEventListener('submit',async e=>{
 
 /* ---------- agenda partagé ---------- */
 const evFromRow=(r,cnt)=>({id:r.id,kind:r.kind,title:esc(r.title),text:esc(r.body||''),date:r.date,end:r.end_date||undefined,time:esc(r.time_label||''),
-  groups:(!r.groups||r.groups.includes('all'))?'all':r.groups,cap:r.cap||0,taken:cnt[r.id]||0,price:esc(r.price||''),guests:!!r.guests,raw:r});
+  groups:(!r.groups||r.groups.includes('all'))?'all':r.groups,cap:r.cap||0,taken:cnt[r.id]||0,price:esc(r.price||''),guests:!!r.guests,team:!!r.team,raw:r});
 async function pullEvents(){
   const [{data,error},c]=await Promise.all([sb.from('events').select('*').order('date'),sb.rpc('event_counts')]);
   if(error) throw error; const cnt={}; ((c&&c.data)||[]).forEach(x=>cnt[x.event_id]=+x.taken);
@@ -1253,7 +1257,7 @@ function vCoachAgenda(){
   ${past.length?`<details class="cev-past"><summary>Événements passés (${past.length})</summary><section class="card cev-list">${past.map(row).join('')}</section></details>`:''}`;
 }
 function evForm(e){
-  const r=e?e.raw||{kind:e.kind,title:e.title,body:e.text,date:e.date,end_date:e.end,time_label:e.time,groups:e.groups==='all'?['all']:e.groups,cap:e.cap||null,price:e.price,guests:e.guests}:{kind:'fort',groups:['all'],guests:false};
+  const r=e?e.raw||{kind:e.kind,title:e.title,body:e.text,date:e.date,end_date:e.end,time_label:e.time,groups:e.groups==='all'?['all']:e.groups,cap:e.cap||null,price:e.price,guests:e.guests,team:e.team}:{kind:'fort',groups:['all'],guests:false,team:false};
   const all=!r.groups||r.groups.includes('all');
   openSheet(`<h2 class="sheet-title">${e?'Modifier l’événement':'Nouvel événement'}</h2>
   <form id="evForm" style="display:flex;flex-direction:column;gap:14px">
@@ -1269,6 +1273,7 @@ function evForm(e){
     <div class="ev-2"><div class="field"><label for="evCap">Places max (vide = sans limite)</label><input id="evCap" type="number" min="1" inputmode="numeric" value="${r.cap||''}"></div>
     <div class="field"><label for="evPrice">Tarif</label><input id="evPrice" maxlength="60" value="${esc(r.price||'')}" placeholder="Ex. : Gratuit, 5 €"></div></div>
     <label class="ackline"><input type="checkbox" id="evGuests" ${r.guests?'checked':''}> Les familles peuvent venir à plusieurs</label>
+    <label class="ackline"><input type="checkbox" id="evTeam" ${r.team?'checked':''}> 🏅 Compétition en équipe : les parents des sélectionnées voient les prénoms de l’équipe</label>
     <button class="btn big" type="submit">${e?'Enregistrer':'Publier dans l’agenda'}</button>
     ${e?`<button type="button" class="link danger" data-evdel="${e.id}">Supprimer cet événement</button>`:''}
   </form>`);
@@ -1289,7 +1294,7 @@ document.addEventListener('submit',async e=>{
   const all=document.getElementById('evAll').checked, gs=[...f.querySelectorAll('[name=evg]:checked')].map(x=>x.value);
   if(!all&&!gs.length){ toast('Choisis au moins un groupe'); return; }
   const row={kind:f.querySelector('[name=kind]:checked').value,title:v('evTitle'),body:v('evBody'),date:v('evDate'),end_date:v('evEnd')||null,time_label:v('evTime'),
-    groups:all?['all']:gs,cap:+v('evCap')||null,price:v('evPrice'),guests:document.getElementById('evGuests').checked};
+    groups:all?['all']:gs,cap:+v('evCap')||null,price:v('evPrice'),guests:document.getElementById('evGuests').checked,team:document.getElementById('evTeam').checked};
   if(!row.title||!row.date){ toast('Indique au moins un titre et une date'); return; }
   if(row.end_date&&row.end_date<row.date){ toast('La date de fin est avant la date de début'); return; }
   const btn=f.querySelector('button[type=submit]'); btn.disabled=true;
@@ -1482,6 +1487,7 @@ const forGroup = (ev,g) => ev.groups==='all' || ev.groups.includes(g);
 const KIND_IC = {stage:'🤸',compet:'🏅',fort:'🎉'};
 function eventCard(ev,k){
   const d=parse(ev.date), past=(ev.end?parse(ev.end):d)<today;
+  if(ev.kind==='compet'&&!isSel(ev.id,k.group,k.name)) return `<button class="ev ev-compet ev-date${past?' past':''}" data-ev="${ev.id}"><span class="ev-ic" aria-hidden="true">🏅</span><span class="ev-main"><span class="kind compet">Compétition du club</span><b>${ev.title}</b><span class="sess-meta tnum">${cap1(fr(d,{weekday:'short',day:'numeric',month:'short'}))}${ev.time?' · '+ev.time:''}</span></span></button>`;
   const mine=regs[`${k.id}|${ev.id}`]; const ok=forGroup(ev,k.group);
   const left=ev.cap?ev.cap-ev.taken-(mine?1:0):Infinity;
   const range = ev.end ? `${fr(d,{day:'numeric'})} → ${fr(parse(ev.end),{day:'numeric',month:'short'})}` : fr(d,{weekday:'short',day:'numeric',month:'short'});
@@ -1649,17 +1655,22 @@ function selStatus(evId,g,gym){
   if(gym.kid){const r=regs[`${gym.kid.id}|${evId}`]; return r?(r.status==='no'?'no':'yes'):null;}
   const n=(gym.i*7+evId.charCodeAt(1))%6; return n<3?'yes':n===3?'no':null;
 }
-function coachCompet(g){
-  const ev=EVENTS.find(e=>e.id===coachEv&&e.kind==='compet')||COMPETS()[0]; const list=roster(g);
+function coachCompet(){
+  const ev=EVENTS.find(e=>e.id===coachEv&&e.kind==='compet')||COMPETS()[0];
   if(!ev) return `<div class="empty">Aucune compétition dans l’agenda pour l’instant.<br>Ajoute-la dans <a href="#cagenda">📅 Agenda</a> (type « Compétition ») pour faire ta sélection ici.</div>`;
-  const sel=list.filter(x=>isSel(ev.id,g,x.name)); const conf=sel.filter(x=>selStatus(ev.id,g,x)==='yes').length; const wait=sel.filter(x=>!selStatus(ev.id,g,x)).length;
+  const groups=Object.keys(GROUPS).filter(g=>catOf(g)!=='Babies');
+  const all=groups.flatMap(g=>roster(g).map(x=>({...x,g})));
+  const sel=all.filter(x=>isSel(ev.id,x.g,x.name)); const conf=sel.filter(x=>selStatus(ev.id,x.g,x)==='yes').length; const wait=sel.filter(x=>!selStatus(ev.id,x.g,x)).length;
+  const btn=gym=>{const on=isSel(ev.id,gym.g,gym.name), st=on?selStatus(ev.id,gym.g,gym):null;
+    const flag=!on?'':st==='yes'?'<span class="pill ok">Confirmée</span>':st==='no'?'<span class="pill no">Absente</span>':'<span class="pill wait">En attente</span>';
+    return `<button class="gym${on?' here':''}" data-csel="${esc(gym.name)}" data-cg="${esc(gym.g)}" aria-pressed="${on}">${avatar(gym.name)}<span class="gym-name">${esc(gym.name)}</span>${flag}<span class="tick" aria-hidden="true">${on?'✓':''}</span></button>`};
   return `<div class="filters" role="group" aria-label="Compétition">${COMPETS().map(e=>`<button class="chip" data-cev="${e.id}" aria-pressed="${e.id===ev.id}">🏅 ${fr(parse(e.date),{day:'numeric',month:'short'})}</button>`).join('')}</div>
-  <b style="display:block;margin:8px 0 2px">${ev.title}</b>
-  <div class="call-head"><div><b class="coach-n tnum">${sel.length}</b> <span class="sess-meta">/ ${list.length} sélectionnées · ${conf} confirmées</span></div>${wait?`<span class="pill wait">${wait} en attente</span>`:'<span class="pill ok">✓ Tout le monde a répondu</span>'}</div>
-  <p class="hint">Touche un prénom pour la sélectionner ou la retirer. Les parents confirment ensuite la présence dans l’appli.</p>
-  <div class="roll">${list.map(gym=>{const on=isSel(ev.id,g,gym.name), st=on?selStatus(ev.id,g,gym):null;
-    const flag=!on?'<span class="pill off">Non retenue</span>':st==='yes'?'<span class="pill ok">Confirmée</span>':st==='no'?'<span class="pill no">Absente</span>':'<span class="pill wait">En attente</span>';
-    return `<button class="gym${on?' here':''}" data-csel="${esc(gym.name)}" aria-pressed="${on}">${avatar(gym.name)}<span class="gym-name">${esc(gym.name)}</span>${flag}<span class="tick" aria-hidden="true">${on?'✓':''}</span></button>`}).join('')}</div>
+  <b style="display:block;margin:8px 0 2px">${ev.title}${ev.team?' <span class="pill">👥 En équipe</span>':''}</b>
+  <div class="call-head"><div><b class="coach-n tnum">${sel.length}</b> <span class="sess-meta">sélectionnée${sel.length>1?'s':''} · ${conf} confirmée${conf>1?'s':''}</span></div>${!sel.length?'':wait?`<span class="pill wait">${wait} en attente</span>`:'<span class="pill ok">✓ Tout le monde a répondu</span>'}</div>
+  <p class="hint">Choisis les gymnastes dans tous les groupes. Seuls leurs parents voient la compétition en détail et confirment la présence ; pour les autres, elle reste une simple date dans l’agenda.</p>
+  ${sel.length?`<div class="csel-sum">${sel.map(x=>`<span class="pname">${avatar(x.name)}${esc(x.name)} <small>${esc(x.g)}</small></span>`).join('')}</div>`:''}
+  ${groups.map(g=>{const r=all.filter(x=>x.g===g); const n=r.filter(x=>isSel(ev.id,g,x.name)).length;
+    return `<details class="csel-grp"${n?' open':''}><summary><b>${g}</b> ${stars(GROUPS[g].n)}<span class="sess-meta">${n?`${n} sélectionnée${n>1?'s':''} · `:''}${r.length?`${r.length} gym`:'aucune gymnaste'}</span></summary>${r.length?`<div class="roll">${r.map(btn).join('')}</div>`:''}</details>`}).join('')}
   <button class="btn big" data-relance ${wait?'':'disabled'}>🔔 Relancer les ${wait} parent${wait>1?'s':''} en attente</button>`;
 }
 let coachSessI=0;
@@ -1745,7 +1756,7 @@ function vCoachs(){
   <div class="filters" role="group" aria-label="Groupe">${byCat(n=>`<button class="chip" data-cgroup="${n}" aria-pressed="${n===g}">${n}${catOf(n)==='GAF'?' '+stars(GROUPS[n].n):''}</button>`,(c,h)=>`<span class="chip-cat">${c}</span>${h}`)}</div>
   ${presenceBoard(g,s)}
   <div class="seg four" role="tablist">${tabs.map(([id,l])=>`<button role="tab" data-ctab="${id}" aria-selected="${coachTab===id}">${l}</button>`).join('')}</div>
-  <section class="card coach-card">${LIVE&&!roster(g).length?'<div class="empty">Aucune gymnaste inscrite dans ce groupe pour l’instant. Elles apparaissent ici dès que leurs parents créent leur compte.</div>':coachTab==='compet'?(catOf(g)==='Babies'?'<div class="empty">Les groupes Babies ne participent pas aux compétitions.</div>':coachCompet(g)):!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
+  <section class="card coach-card">${coachTab==='compet'?coachCompet():LIVE&&!roster(g).length?'<div class="empty">Aucune gymnaste inscrite dans ce groupe pour l’instant. Elles apparaissent ici dès que leurs parents créent leur compte.</div>':!s?'<div class="empty">Pas de cours prévu.</div>':coachTab==='appel'?coachAppel(g,s):coachTab==='prog'?coachProg(g,s):coachBadges(g)}</section>
   <p class="proto demo-only">Aperçu côté coachs · gymnastes et réponses simulées pour la démo</p>`;
 }
 function myBadges(k){
@@ -1936,9 +1947,9 @@ function evSheet(id){
   let action;
   const warn=`<div class="feewarn" role="note"><span aria-hidden="true">⚠️</span><p><b>Important :</b> si l’enfant est inscrit et ne vient pas, <b>cette somme (${esc(ev.price.replace(/^Engagement\s*/,''))}) sera à la charge des parents</b>, sauf maladie avec certificat médical.</p></div>`;
   if(past) action='<span class="pill off">Terminé</span>';
-  else if(ev.kind==='compet'&&!isSel(ev.id,k.group,k.name)) action=`<div class="empty">Ce sont les coachs qui choisissent les gymnastes pour chaque compétition. ${esc(k.name)} n’a pas été retenue cette fois-ci.</div>`;
+  else if(ev.kind==='compet'&&!isSel(ev.id,k.group,k.name)) action=`<div class="empty">Date de compétition du club. Ce sont les coachs qui sélectionnent les gymnastes : si ${esc(k.name)} est retenue, la compétition s’affichera ici en détail et tu seras prévenu·e.</div>`;
   else if(ev.kind==='compet'){
-    const sel=`<div class="selbox">🏅 <b>${esc(k.name)}</b> a été sélectionnée par les coachs pour cette compétition.</div>`;
+    const sel=`<div class="selbox">🏅 <b>${esc(k.name)}</b> a été sélectionnée par les coachs pour cette compétition.</div>${ev.team?'<div class="team-box" id="teamBox"><b>👥 L’équipe</b><p class="sess-meta">Chargement…</p></div>':''}`;
     if(mine&&mine.status!=='no') action=`${sel}${warn}<div class="allgood">✓ Présence de ${esc(k.name)} confirmée</div><button class="link" data-unreg="${ev.id}">Modifier ma réponse</button>`;
     else if(mine) action=`${sel}<div class="empty">${esc(k.name)} ne pourra pas venir · les coachs sont prévenus</div><button class="link" data-unreg="${ev.id}">Modifier ma réponse</button>`;
     else action=`${sel}${warn}<label class="ackline"><input type="checkbox" id="ack"> J’ai lu et j’accepte cette condition</label><button class="btn big" data-presence="${ev.id}" disabled>Je confirme la présence de ${esc(k.name)}</button><button class="link" data-absent="${ev.id}">${esc(k.name)} ne pourra pas venir</button>`;
@@ -1950,6 +1961,14 @@ function evSheet(id){
   openSheet(`<span class="ev-ic lg" aria-hidden="true">${KIND_IC[ev.kind]}</span><span class="kind ${ev.kind}">${KIND[ev.kind]}</span><h2>${ev.title}</h2>
   <div class="facts"><span>📅 ${range}</span><span>⏰ ${ev.time}</span><span>💶 ${ev.price}</span></div>
   <p class="sess-meta" style="margin:0">${ev.text}</p>${action}${past||window.claude?'':`<button class="btn ghost" data-ics="${ev.id}">📅 Ajouter à mon agenda</button>`}`);
+  if(ev.kind==='compet'&&ev.team&&isSel(ev.id,k.group,k.name)) fillTeam(ev,k);
+}
+async function fillTeam(ev,k){
+  let names=[];
+  if(LIVE){ try{ const {data}=await sb.rpc('team_members',{ev:ev.id}); names=(data||[]).map(x=>({name:x.name,g:x.grp})); }catch(e){} }
+  else names=Object.keys(GROUPS).filter(g=>catOf(g)!=='Babies').flatMap(g=>roster(g).filter(x=>isSel(ev.id,g,x.name)).map(x=>({name:x.name,g})));
+  const box=document.getElementById('teamBox'); if(!box) return;
+  box.innerHTML=`<b>👥 L’équipe · ${names.length} gymnaste${names.length>1?'s':''}</b><div class="pnames">${names.map(x=>`<span class="pname${x.name===k.name&&x.g===k.group?' me':''}">${avatar(x.name)}${esc(x.name)} <small>${esc(x.g)}</small></span>`).join('')||'<span class="pnone">Équipe pas encore complète</span>'}</div>`;
 }
 
 /* ================= rendu & événements ================= */
@@ -2051,7 +2070,7 @@ document.addEventListener('click',e=>{
   else if('abs' in d){ absSheet(); }
   else if(d.ics){ downloadIcs(EVENTS.find(e=>e.id===d.ics)); }
   else if(d.cev){ coachEv=d.cev; store.set('cev',coachEv); render(); }
-  else if(d.csel){ const g=coachGroup,k=`${coachEv}|${g}|${d.csel}`; csel[k]=!isSel(coachEv,g,d.csel); store.set('csel',csel); render(); toast(csel[k]?`🏅 ${d.csel} sélectionnée · ses parents sont prévenus`:`${d.csel} retirée de la sélection`); }
+  else if(d.csel){ const g=d.cg||coachGroup,k=`${coachEv}|${g}|${d.csel}`; csel[k]=!isSel(coachEv,g,d.csel); store.set('csel',csel); render(); toast(csel[k]?`🏅 ${d.csel} sélectionnée · ses parents sont prévenus`:`${d.csel} retirée de la sélection`); }
   else if('relance' in d){ const r=b.getBoundingClientRect(); burst(r); toast('🔔 Rappel envoyé aux parents'); }
   else if(d.ctab){ coachTab=d.ctab; store.set('ctab',coachTab); picker=false; render(); }
   else if(d.call){ const g=coachGroup,s=coachNext(g),gym=roster(g).find(x=>x.name===d.call); const k=callKey(g,s,gym); appel[k]=!isHere(g,s,gym); delete appelDone[`${g}|${s.key}`]; store.set('appel',appel); store.set('appelDone',appelDone); render(); }

@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
   } else if (type === "event") {
     const { data: e } = await sb.from("events").select("*").eq("id", id).maybeSingle();
     if (!e || !fresh(e.created_at)) return new Response("skip");
+    if (e.kind === "compet") return new Response("compet: only selected families are notified");
     const groups: string[] | null = !e.groups || e.groups.includes("all") ? null : e.groups;
     users = (await parentsOfGroups(groups)).filter((u) => u !== e.created_by);
     const d = new Date(e.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
