@@ -8,7 +8,8 @@ const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
 let vapidReady = "";
 function initVapid(): string {
   if (vapidReady === "ok") return "ok";
-  const priv = (Deno.env.get("VAPID_PRIVATE") ?? "").trim().replace(/^["']|["']$/g, "");
+  const raw = Deno.env.get("VAPID_PRIVATE") ?? "";
+  const priv = (raw.match(/[A-Za-z0-9_-]{43}/) ?? [""])[0]; // retrouve la clé même si du texte a été copié autour
   if (!priv) return (vapidReady = "secret VAPID_PRIVATE manquant");
   try { webpush.setVapidDetails("mailto:academie.gym.med@gmail.com", VAPID_PUBLIC, priv); return (vapidReady = "ok"); }
   catch (e) { return (vapidReady = "clé VAPID_PRIVATE invalide (" + (e as Error).message + ")"); }
